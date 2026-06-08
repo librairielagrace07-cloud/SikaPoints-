@@ -25,7 +25,7 @@ export interface PaiementGeniusPay {
 }
 
 export async function creerPaiement(p: CreerPaiementParams): Promise<PaiementGeniusPay> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
 
   const body = {
     amount: p.montant,
