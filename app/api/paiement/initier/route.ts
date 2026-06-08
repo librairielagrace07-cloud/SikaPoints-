@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { creerPaiement } from '@/lib/geniuspay'
 
+export const runtime = 'edge'
+
 const PRIX: Record<string, Record<string, number>> = {
   solo:       { mensuel: 1900,  annuel: 1500  },
   croissance: { mensuel: 4900,  annuel: 3900  },

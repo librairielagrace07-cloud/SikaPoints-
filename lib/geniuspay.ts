@@ -3,8 +3,13 @@ const BASE_URL = 'https://geniuspay.ci/api/v1/merchant'
 function headers() {
   return {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     'X-API-Key': process.env.GENIUSPAY_API_KEY!,
     'X-API-Secret': process.env.GENIUSPAY_API_SECRET!,
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+    'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+    'Origin': 'https://geniuspay.ci',
+    'Referer': 'https://geniuspay.ci/',
   }
 }
 
