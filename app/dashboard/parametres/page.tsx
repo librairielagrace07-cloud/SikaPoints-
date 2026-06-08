@@ -88,7 +88,9 @@ export default async function ParametresPage({
                 )}
               </div>
               <p className="font-semibold text-gray-900 text-sm truncate w-full">{nom}</p>
-              <p className="text-xs text-gray-400 truncate w-full mt-0.5">{email}</p>
+              {!email.endsWith('@mmmanager.local') && (
+                <p className="text-xs text-gray-400 truncate w-full mt-0.5">{email}</p>
+              )}
               <div className={`flex items-center gap-1 mt-2.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                 estProprietaire ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
               }`}>

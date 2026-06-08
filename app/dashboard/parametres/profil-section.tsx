@@ -25,7 +25,7 @@ export default function ProfilSection({ nomActuel, email, role, telephone, dateI
       {/* Infos en lecture seule */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
         <InfoRow label="Rôle" value={role === 'PROPRIETAIRE' ? 'Propriétaire' : 'Agent'} />
-        <InfoRow label="Email" value={email} />
+        {!email.endsWith('@mmmanager.local') && <InfoRow label="Email" value={email} />}
         {telephone && <InfoRow label="Téléphone" value={telephone} />}
         <InfoRow label="Membre depuis" value={dateStr} />
       </div>
