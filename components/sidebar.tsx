@@ -87,6 +87,7 @@ export default function Sidebar({ nomUtilisateur, avatarUrl, notificationsNonLue
             <Link
               key={href}
               href={href}
+              prefetch={true}
               title={collapsed ? label : undefined}
               className={cn(
                 'relative flex items-center rounded-xl text-sm font-medium transition-colors duration-200 group overflow-hidden',

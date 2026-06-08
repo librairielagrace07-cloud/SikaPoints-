@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist } from 'next/font/google'
 import { ThemeProvider } from '@/lib/providers/theme-provider'
+import NextTopLoader from 'nextjs-toploader'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-full flex flex-col bg-gray-50">
+        <NextTopLoader color="#16a34a" height={3} showSpinner={false} shadow="0 0 10px #16a34a,0 0 5px #16a34a" />
         <ThemeProvider>
           {children}
         </ThemeProvider>
