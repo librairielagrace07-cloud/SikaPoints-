@@ -89,19 +89,40 @@ export default function Sidebar({ nomUtilisateur, avatarUrl, notificationsNonLue
               href={href}
               title={collapsed ? label : undefined}
               className={cn(
-                'flex items-center rounded-lg text-sm font-medium transition-colors duration-150 relative group',
+                'relative flex items-center rounded-xl text-sm font-medium transition-colors duration-200 group overflow-hidden',
                 collapsed ? 'px-0 py-2.5 justify-center' : 'px-3 py-2.5 gap-3',
-                active
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                active ? 'text-blue-700' : 'text-gray-500 hover:text-gray-900'
               )}
             >
-              <Icon className="w-5 h-5 shrink-0" />
-
-              {/* Label avec animation */}
+              {/* Fond wipe-in de gauche à droite */}
               <span className={cn(
-                'whitespace-nowrap overflow-hidden transition-all duration-300',
-                collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+                'absolute inset-0 rounded-xl transition-transform duration-300 ease-out origin-left',
+                active
+                  ? 'bg-linear-to-r from-blue-50 to-blue-50/60 scale-x-100'
+                  : 'bg-gray-100/80 scale-x-0 group-hover:scale-x-100'
+              )} />
+
+              {/* Barre latérale indicatrice */}
+              <span className={cn(
+                'absolute left-0 rounded-r-full bg-blue-500 transition-all duration-300 ease-out',
+                active
+                  ? 'top-2 bottom-2 w-0.75 opacity-100'
+                  : 'top-1/2 -translate-y-1/2 w-0.75 h-0 opacity-0 group-hover:h-5 group-hover:opacity-40'
+              )} />
+
+              {/* Icône avec rebond */}
+              <Icon className={cn(
+                'w-5 h-5 shrink-0 relative z-10 transition-all duration-200',
+                active
+                  ? 'text-blue-600'
+                  : 'text-gray-400 group-hover:text-blue-500 group-hover:scale-110 group-hover:-translate-y-px'
+              )} />
+
+              {/* Label */}
+              <span className={cn(
+                'whitespace-nowrap overflow-hidden relative z-10 transition-all duration-300',
+                collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
+                !active ? 'group-hover:translate-x-0.5' : ''
               )}>
                 {label}
               </span>
@@ -109,14 +130,14 @@ export default function Sidebar({ nomUtilisateur, avatarUrl, notificationsNonLue
               {/* Badge notifications */}
               {badge && (
                 <span className={cn(
-                  'bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shrink-0',
-                  collapsed ? 'absolute -top-1 -right-1 w-4 h-4 text-[10px]' : 'ml-auto'
+                  'relative z-10 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shrink-0',
+                  collapsed ? 'absolute -top-1 -right-1 w-4 h-4 text-[10px]' : 'w-5 h-5 ml-auto'
                 )}>
                   {notificationsNonLues > 9 ? '9+' : notificationsNonLues}
                 </span>
               )}
 
-              {/* Tooltip en mode collapsed */}
+              {/* Tooltip collapsed */}
               {collapsed && (
                 <span className="pointer-events-none absolute left-full ml-3 px-2.5 py-1.5 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap z-50 shadow-lg">
                   {label}
