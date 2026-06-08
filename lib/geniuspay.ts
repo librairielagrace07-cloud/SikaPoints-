@@ -44,17 +44,22 @@ export async function creerPaiement(p: CreerPaiementParams): Promise<PaiementGen
     },
   }
 
+  const reqBody = JSON.stringify(body)
+  console.log('[GeniusPay] POST /payments → body:', reqBody)
+  console.log('[GeniusPay] return_url:', body.return_url, '| callback_url:', body.callback_url)
+
   const res = await fetch(`${BASE_URL}/payments`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify(body),
+    body: reqBody,
   })
 
   const raw = await res.json().catch(() => ({}))
-  console.log('[GeniusPay] POST /payments →', res.status, JSON.stringify(raw))
+  console.log('[GeniusPay] POST /payments ← status:', res.status, '| body:', JSON.stringify(raw))
 
   if (!res.ok) {
-    throw new Error(`GeniusPay ${res.status}: ${raw?.message ?? raw?.error ?? JSON.stringify(raw)}`)
+    const detail = raw?.message ?? raw?.error ?? raw?.detail ?? raw?.errors ?? JSON.stringify(raw)
+    throw new Error(`GeniusPay ${res.status}: ${typeof detail === 'object' ? JSON.stringify(detail) : detail}`)
   }
 
   // GeniusPay enveloppe la réponse dans un objet "data"
