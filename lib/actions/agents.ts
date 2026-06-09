@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { getLimits, getPlanLabel } from '@/lib/plan-limits'
+import { uuidSchema, safeText, telephoneSchema, passwordSchema } from '@/lib/validation'
 
 export type ActionState = { error?: string; success?: boolean }
 
@@ -16,26 +17,65 @@ export type Permissions = {
 }
 
 const AgentCompteSchema = z.object({
-  nom_complet: z.string().min(2, 'Nom requis (min 2 caractères)'),
-  telephone: z.string().min(8, 'Numéro de téléphone requis'),
-  point_de_vente_id: z.string().uuid('Point de vente requis'),
-  mot_de_passe: z.string().min(6, 'Mot de passe: au moins 6 caractères'),
-  peut_deposer: z.boolean().default(true),
-  peut_retirer: z.boolean().default(true),
+  nom_complet:       safeText(2, 100, 'Nom'),
+  telephone:         telephoneSchema,
+  point_de_vente_id: uuidSchema,
+  mot_de_passe:      passwordSchema,
+  peut_deposer:      z.boolean().default(true),
+  peut_retirer:      z.boolean().default(true),
   peut_voir_rapports: z.boolean().default(false),
-  peut_modifier_uv: z.boolean().default(false),
+  peut_modifier_uv:  z.boolean().default(false),
 })
+
+/** Vérifie que l'agent appartient (via son point) à l'utilisateur connecté. */
+async function verifierProprieteAgent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  agentId: string,
+  userId: string,
+): Promise<{ agentUserId: string | null } | null> {
+  const { data: agent } = await supabase
+    .from('agents')
+    .select('user_id, point_de_vente_id')
+    .eq('id', agentId)
+    .single()
+
+  if (!agent) return null
+
+  const { data: point } = await supabase
+    .from('points_de_vente')
+    .select('id')
+    .eq('id', (agent as { point_de_vente_id: string }).point_de_vente_id)
+    .eq('proprietaire_id', userId)
+    .single()
+
+  if (!point) return null
+  return { agentUserId: (agent as { user_id: string | null }).user_id ?? null }
+}
 
 export async function creerCompteAgent(prevState: ActionState, formData: FormData): Promise<ActionState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
+  const raw = {
+    nom_complet:        formData.get('nom_complet') as string,
+    telephone:          formData.get('telephone') as string,
+    point_de_vente_id:  formData.get('point_de_vente_id') as string,
+    mot_de_passe:       formData.get('mot_de_passe') as string,
+    peut_deposer:       formData.get('peut_deposer') === 'on',
+    peut_retirer:       formData.get('peut_retirer') === 'on',
+    peut_voir_rapports: formData.get('peut_voir_rapports') === 'on',
+    peut_modifier_uv:   formData.get('peut_modifier_uv') === 'on',
+  }
+
+  const parsed = AgentCompteSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0].message }
+
   // Vérifier que le point appartient à cet admin
   const { data: point } = await supabase
     .from('points_de_vente')
     .select('id, nom')
-    .eq('id', formData.get('point_de_vente_id') as string)
+    .eq('id', parsed.data.point_de_vente_id)
     .eq('proprietaire_id', user.id)
     .single()
 
@@ -60,21 +100,7 @@ export async function creerCompteAgent(prevState: ActionState, formData: FormDat
     }
   }
 
-  const raw = {
-    nom_complet: formData.get('nom_complet') as string,
-    telephone: formData.get('telephone') as string,
-    point_de_vente_id: formData.get('point_de_vente_id') as string,
-    mot_de_passe: formData.get('mot_de_passe') as string,
-    peut_deposer: formData.get('peut_deposer') === 'on',
-    peut_retirer: formData.get('peut_retirer') === 'on',
-    peut_voir_rapports: formData.get('peut_voir_rapports') === 'on',
-    peut_modifier_uv: formData.get('peut_modifier_uv') === 'on',
-  }
-
-  const parsed = AgentCompteSchema.safeParse(raw)
-  if (!parsed.success) return { error: parsed.error.issues[0].message }
-
-  const telephone = parsed.data.telephone.trim()
+  const telephone = parsed.data.telephone
 
   // Vérifier que le téléphone n'est pas déjà utilisé
   const adminSupabase = createAdminClient()
@@ -84,12 +110,11 @@ export async function creerCompteAgent(prevState: ActionState, formData: FormDat
   )
   if (alreadyExists) return { error: `Le numéro ${telephone} est déjà utilisé` }
 
-  // Créer l'utilisateur dans Supabase Auth (email fictif basé sur le téléphone)
-  const fakeEmail = `${telephone.replace(/\s+/g, '')}@mmmanager.local`
+  const fakeEmail = `${telephone.replace(/[\s\+\-\(\)]/g, '')}@mmmanager.local`
   const { data: newUser, error: authError } = await adminSupabase.auth.admin.createUser({
     email: fakeEmail,
     password: parsed.data.mot_de_passe,
-    email_confirm: true, // Pas de confirmation email nécessaire
+    email_confirm: true,
     user_metadata: {
       nom_complet: parsed.data.nom_complet,
       telephone,
@@ -101,22 +126,20 @@ export async function creerCompteAgent(prevState: ActionState, formData: FormDat
     return { error: authError?.message ?? 'Erreur création du compte' }
   }
 
-  // Créer l'enregistrement agent lié à ce user
   const { error: agentError } = await adminSupabase.from('agents').insert({
-    user_id: newUser.user.id,
-    nom_complet: parsed.data.nom_complet,
+    user_id:           newUser.user.id,
+    nom_complet:       parsed.data.nom_complet,
     telephone,
-    email: fakeEmail,
+    email:             fakeEmail,
     point_de_vente_id: parsed.data.point_de_vente_id,
-    actif: true,
-    peut_deposer: parsed.data.peut_deposer,
-    peut_retirer: parsed.data.peut_retirer,
+    actif:             true,
+    peut_deposer:      parsed.data.peut_deposer,
+    peut_retirer:      parsed.data.peut_retirer,
     peut_voir_rapports: parsed.data.peut_voir_rapports,
-    peut_modifier_uv: parsed.data.peut_modifier_uv,
+    peut_modifier_uv:  parsed.data.peut_modifier_uv,
   })
 
   if (agentError) {
-    // Annuler la création du user si l'agent échoue
     await adminSupabase.auth.admin.deleteUser(newUser.user.id)
     return { error: agentError.message }
   }
@@ -131,45 +154,41 @@ export async function modifierAgent(prevState: ActionState, formData: FormData):
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  const agentId = formData.get('agent_id') as string
-  const nom_complet = (formData.get('nom_complet') as string)?.trim()
-  const telephone = (formData.get('telephone') as string)?.trim()
+  const agentIdResult = uuidSchema.safeParse(formData.get('agent_id'))
+  if (!agentIdResult.success) return { error: 'Identifiant agent invalide' }
 
-  if (!nom_complet || nom_complet.length < 2) return { error: 'Nom requis (min 2 caractères)' }
-  if (!telephone || telephone.length < 8) return { error: 'Numéro de téléphone requis' }
+  const nomResult = safeText(2, 100, 'Nom').safeParse(formData.get('nom_complet'))
+  if (!nomResult.success) return { error: nomResult.error.issues[0].message }
 
-  // Récupérer l'agent pour mettre à jour aussi les metadata auth
-  const { data: agent } = await supabase
+  const telResult = telephoneSchema.safeParse(formData.get('telephone'))
+  if (!telResult.success) return { error: telResult.error.issues[0].message }
+
+  // Vérifier que l'agent appartient à un point de cet admin
+  const ownership = await verifierProprieteAgent(supabase, agentIdResult.data, user.id)
+  if (!ownership) return { error: 'Agent introuvable ou accès non autorisé' }
+
+  const { data: agentCurrent } = await supabase
     .from('agents')
-    .select('user_id, telephone')
-    .eq('id', agentId)
+    .select('telephone')
+    .eq('id', agentIdResult.data)
     .single()
 
-  if (!agent) return { error: 'Agent introuvable' }
-
-  // Mettre à jour dans la table agents
   const { error } = await supabase.from('agents').update({
-    nom_complet,
-    telephone,
-  }).eq('id', agentId)
+    nom_complet: nomResult.data,
+    telephone:   telResult.data,
+  }).eq('id', agentIdResult.data)
 
   if (error) return { error: error.message }
 
-  // Mettre à jour les metadata auth + l'email fictif si le téléphone a changé
-  if (agent.user_id && telephone !== (agent as { telephone: string | null }).telephone) {
+  if (ownership.agentUserId) {
     const adminSupabase = createAdminClient()
-    const newFakeEmail = `${telephone.replace(/\s+/g, '')}@mmmanager.local`
-    await adminSupabase.auth.admin.updateUserById(agent.user_id as string, {
-      email: newFakeEmail,
-      user_metadata: { nom_complet, telephone },
-    })
-    // Mettre à jour l'email dans agents aussi
-    await supabase.from('agents').update({ email: newFakeEmail }).eq('id', agentId)
-  } else if (agent.user_id) {
-    const adminSupabase = createAdminClient()
-    await adminSupabase.auth.admin.updateUserById(agent.user_id as string, {
-      user_metadata: { nom_complet, telephone },
-    })
+    const updates: Record<string, unknown> = { user_metadata: { nom_complet: nomResult.data, telephone: telResult.data } }
+    if (telResult.data !== (agentCurrent as { telephone: string } | null)?.telephone) {
+      const newFakeEmail = `${telResult.data.replace(/[\s\+\-\(\)]/g, '')}@mmmanager.local`
+      updates.email = newFakeEmail
+      await supabase.from('agents').update({ email: newFakeEmail }).eq('id', agentIdResult.data)
+    }
+    await adminSupabase.auth.admin.updateUserById(ownership.agentUserId, updates)
   }
 
   revalidatePath('/dashboard/agents')
@@ -181,15 +200,20 @@ export async function modifierPermissions(prevState: ActionState, formData: Form
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  const agentId = formData.get('agent_id') as string
+  const agentIdResult = uuidSchema.safeParse(formData.get('agent_id'))
+  if (!agentIdResult.success) return { error: 'Identifiant agent invalide' }
+
+  // Vérifier ownership
+  const ownership = await verifierProprieteAgent(supabase, agentIdResult.data, user.id)
+  if (!ownership) return { error: 'Agent introuvable ou accès non autorisé' }
 
   const { error } = await supabase.from('agents').update({
-    peut_deposer: formData.get('peut_deposer') === 'on',
-    peut_retirer: formData.get('peut_retirer') === 'on',
+    peut_deposer:       formData.get('peut_deposer')       === 'on',
+    peut_retirer:       formData.get('peut_retirer')       === 'on',
     peut_voir_rapports: formData.get('peut_voir_rapports') === 'on',
-    peut_modifier_uv: formData.get('peut_modifier_uv') === 'on',
-    actif: formData.get('actif') === 'on',
-  }).eq('id', agentId)
+    peut_modifier_uv:   formData.get('peut_modifier_uv')   === 'on',
+    actif:              formData.get('actif')               === 'on',
+  }).eq('id', agentIdResult.data)
 
   if (error) return { error: error.message }
 
@@ -202,26 +226,21 @@ export async function reinitialiserMotDePasse(prevState: ActionState, formData: 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  const agentId = formData.get('agent_id') as string
-  const nouveauMdp = formData.get('nouveau_mdp') as string
+  const agentIdResult = uuidSchema.safeParse(formData.get('agent_id'))
+  if (!agentIdResult.success) return { error: 'Identifiant agent invalide' }
 
-  if (!nouveauMdp || nouveauMdp.length < 6) {
-    return { error: 'Le mot de passe doit avoir au moins 6 caractères' }
-  }
+  const mdpResult = passwordSchema.safeParse(formData.get('nouveau_mdp'))
+  if (!mdpResult.success) return { error: mdpResult.error.issues[0].message }
 
-  // Récupérer le user_id de l'agent
-  const { data: agent } = await supabase
-    .from('agents')
-    .select('user_id')
-    .eq('id', agentId)
-    .single()
-
-  if (!agent?.user_id) return { error: 'Agent introuvable' }
+  // Vérifier ownership
+  const ownership = await verifierProprieteAgent(supabase, agentIdResult.data, user.id)
+  if (!ownership) return { error: 'Agent introuvable ou accès non autorisé' }
+  if (!ownership.agentUserId) return { error: 'Compte agent introuvable' }
 
   const adminSupabase = createAdminClient()
   const { error } = await adminSupabase.auth.admin.updateUserById(
-    agent.user_id as string,
-    { password: nouveauMdp }
+    ownership.agentUserId,
+    { password: mdpResult.data }
   )
 
   if (error) return { error: error.message }
@@ -232,24 +251,26 @@ export async function reinitialiserMotDePasse(prevState: ActionState, formData: 
 
 export async function supprimerAgent(id: string, pointId: string): Promise<ActionState> {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
 
-  // Récupérer le user_id avant suppression
-  const { data: agent } = await supabase
-    .from('agents')
-    .select('user_id')
-    .eq('id', id)
-    .single()
+  const idResult      = uuidSchema.safeParse(id)
+  const pointIdResult = uuidSchema.safeParse(pointId)
+  if (!idResult.success || !pointIdResult.success) return { error: 'Identifiants invalides' }
 
-  const { error } = await supabase.from('agents').delete().eq('id', id)
+  // Vérifier ownership
+  const ownership = await verifierProprieteAgent(supabase, idResult.data, user.id)
+  if (!ownership) return { error: 'Agent introuvable ou accès non autorisé' }
+
+  const { error } = await supabase.from('agents').delete().eq('id', idResult.data)
   if (error) return { error: error.message }
 
-  // Supprimer aussi le compte auth si c'est un compte agent
-  if (agent?.user_id) {
+  if (ownership.agentUserId) {
     const adminSupabase = createAdminClient()
-    await adminSupabase.auth.admin.deleteUser(agent.user_id as string)
+    await adminSupabase.auth.admin.deleteUser(ownership.agentUserId)
   }
 
   revalidatePath('/dashboard/agents')
-  revalidatePath(`/dashboard/points/${pointId}`)
+  revalidatePath(`/dashboard/points/${pointIdResult.data}`)
   return { success: true }
 }

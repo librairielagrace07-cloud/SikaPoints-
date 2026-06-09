@@ -4,13 +4,17 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
+import { safeText, passwordSchema, montantSchema } from '@/lib/validation'
 
 export type ActionState = { error?: string; success?: string }
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024 // 2 Mo
 
 // ─── Modifier le profil (nom complet) ────────────────────────────────────────
 
 const ProfilSchema = z.object({
-  nom_complet: z.string().min(2, 'Nom requis (min 2 caractères)'),
+  nom_complet: safeText(2, 100, 'Nom complet'),
 })
 
 export async function modifierProfil(prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -28,7 +32,6 @@ export async function modifierProfil(prevState: ActionState, formData: FormData)
 
   if (error) return { error: error.message }
 
-  // Sync metadata auth
   await supabase.auth.updateUser({ data: { nom_complet: parsed.data.nom_complet } })
 
   revalidatePath('/dashboard')
@@ -39,9 +42,9 @@ export async function modifierProfil(prevState: ActionState, formData: FormData)
 // ─── Changer le mot de passe ──────────────────────────────────────────────────
 
 const MdpSchema = z.object({
-  mdp_actuel: z.string().min(1, 'Mot de passe actuel requis'),
-  nouveau_mdp: z.string().min(6, 'Nouveau mot de passe : au moins 6 caractères'),
-  confirmer_mdp: z.string(),
+  mdp_actuel:    z.string().min(1, 'Mot de passe actuel requis').max(100),
+  nouveau_mdp:   passwordSchema,
+  confirmer_mdp: z.string().max(100),
 }).refine(d => d.nouveau_mdp === d.confirmer_mdp, {
   message: 'Les mots de passe ne correspondent pas',
   path: ['confirmer_mdp'],
@@ -53,13 +56,12 @@ export async function changerMotDePasse(prevState: ActionState, formData: FormDa
   if (!user) return { error: 'Non authentifié' }
 
   const parsed = MdpSchema.safeParse({
-    mdp_actuel: formData.get('mdp_actuel'),
-    nouveau_mdp: formData.get('nouveau_mdp'),
+    mdp_actuel:    formData.get('mdp_actuel'),
+    nouveau_mdp:   formData.get('nouveau_mdp'),
     confirmer_mdp: formData.get('confirmer_mdp'),
   })
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
-  // Vérifier le mot de passe actuel en essayant de se connecter
   const email = user.email!
   const { error: loginError } = await supabase.auth.signInWithPassword({
     email,
@@ -67,17 +69,16 @@ export async function changerMotDePasse(prevState: ActionState, formData: FormDa
   })
   if (loginError) return { error: 'Mot de passe actuel incorrect' }
 
-  // Mettre à jour
   const { error } = await supabase.auth.updateUser({ password: parsed.data.nouveau_mdp })
   if (error) return { error: error.message }
 
   return { success: 'Mot de passe mis à jour' }
 }
 
-// ─── Seuil UV par défaut (propriétaire) ───────────────────────────────────────
+// ─── Seuil UV par défaut ───────────────────────────────────────────────────────
 
 const SeuilSchema = z.object({
-  seuil_defaut: z.number().min(0, 'Le seuil doit être positif ou nul'),
+  seuil_defaut: montantSchema.or(z.literal(0)),
 })
 
 export async function definirSeuilDefaut(prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -88,13 +89,11 @@ export async function definirSeuilDefaut(prevState: ActionState, formData: FormD
   const parsed = SeuilSchema.safeParse({ seuil_defaut: Number(formData.get('seuil_defaut')) })
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
-  // Stocker dans les user_metadata (pas de colonne dédiée, évite une migration)
   const { error } = await supabase.auth.updateUser({
     data: { seuil_uv_defaut: parsed.data.seuil_defaut },
   })
   if (error) return { error: error.message }
 
-  // Appliquer à tous les UV existants de ce propriétaire
   if (formData.get('appliquer_existants') === 'on') {
     const { data: points } = await supabase
       .from('points_de_vente')
@@ -114,7 +113,7 @@ export async function definirSeuilDefaut(prevState: ActionState, formData: FormD
   return { success: 'Seuil par défaut enregistré' }
 }
 
-// ─── Avatar : upload + suppression (admin client → bypass RLS Storage) ────────
+// ─── Avatar : upload + suppression ────────────────────────────────────────────
 
 export async function uploadAvatar(
   prevState: ActionState,
@@ -127,21 +126,29 @@ export async function uploadAvatar(
   const file = formData.get('avatar') as File | null
   if (!file || file.size === 0) return { error: 'Aucun fichier reçu' }
 
+  // Validation côté serveur : type MIME + taille
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return { error: 'Format non supporté (JPEG, PNG, WebP ou GIF uniquement)' }
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    return { error: 'Image trop lourde (max 2 Mo)' }
+  }
+
   const admin = createAdminClient()
 
-  // Créer le bucket si absent (idempotent)
   await admin.storage.createBucket('avatars', {
     public: true,
-    fileSizeLimit: 2097152,
-    allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    fileSizeLimit: MAX_AVATAR_BYTES,
+    allowedMimeTypes: ALLOWED_IMAGE_TYPES,
   })
 
   const bytes = await file.arrayBuffer()
-  const path = `${user.id}/profile.jpg`
+  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+  const path = `${user.id}/profile.${ext}`
 
   const { error: uploadError } = await admin.storage
     .from('avatars')
-    .upload(path, Buffer.from(bytes), { upsert: true, contentType: 'image/jpeg' })
+    .upload(path, Buffer.from(bytes), { upsert: true, contentType: file.type })
 
   if (uploadError) return { error: uploadError.message }
 
@@ -166,7 +173,13 @@ export async function supprimerAvatar(prevState: ActionState, formData: FormData
   if (!user) return { error: 'Non authentifié' }
 
   const admin = createAdminClient()
-  await admin.storage.from('avatars').remove([`${user.id}/profile.jpg`])
+  // Supprimer toutes les extensions possibles
+  await admin.storage.from('avatars').remove([
+    `${user.id}/profile.jpg`,
+    `${user.id}/profile.png`,
+    `${user.id}/profile.webp`,
+    `${user.id}/profile.gif`,
+  ])
 
   const { error } = await supabase
     .from('profils')
@@ -187,7 +200,7 @@ export async function supprimerCompte(prevState: ActionState, formData: FormData
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
-  const confirmation = formData.get('confirmation') as string
+  const confirmation = (formData.get('confirmation') as string ?? '').trim()
   if (confirmation !== 'SUPPRIMER') return { error: 'Tapez "SUPPRIMER" pour confirmer' }
 
   const adminClient = createAdminClient()

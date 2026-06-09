@@ -3,18 +3,23 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { uuidSchema, safeText, montantSchema } from '@/lib/validation'
 
 const DepenseSchema = z.object({
-  date_depense:        z.string().min(1, 'Date requise'),
-  libelle:             z.string().min(1, 'Libellé requis').max(200),
-  montant:             z.coerce.number().positive('Montant invalide'),
-  compte_code:         z.string().min(1, 'Compte requis'),
-  compte_libelle:      z.string().min(1),
-  compte_contrepartie: z.string().min(1, 'Contrepartie requise'),
-  libelle_contrepartie:z.string().min(1),
-  point_de_vente_id:   z.string().optional().nullable(),
-  mode_paiement:       z.enum(['ESPECES','VIREMENT','CHEQUE','MOBILE_MONEY']),
-  note:                z.string().optional().nullable(),
+  date_depense:         z.string().min(1, 'Date requise').max(20),
+  libelle:              safeText(1, 200, 'Libellé'),
+  montant:              montantSchema,
+  compte_code:          z.string().min(1, 'Compte requis').max(20).regex(/^[\w\-]+$/, 'Code compte invalide'),
+  compte_libelle:       safeText(1, 100, 'Compte libellé'),
+  compte_contrepartie:  z.string().min(1, 'Contrepartie requise').max(20).regex(/^[\w\-]+$/, 'Code contrepartie invalide'),
+  libelle_contrepartie: safeText(1, 100, 'Libellé contrepartie'),
+  point_de_vente_id:    uuidSchema.optional().nullable(),
+  mode_paiement:        z.enum(['ESPECES', 'VIREMENT', 'CHEQUE', 'MOBILE_MONEY']),
+  note:                 safeText(0, 500, 'Note').optional().nullable(),
+})
+
+const TauxSchema = z.object({
+  taux: z.number().min(0).max(100),
 })
 
 type State = { error?: string; success?: string }
@@ -30,11 +35,22 @@ export async function ajouterDepense(prevState: State, formData: FormData): Prom
 
   const { point_de_vente_id, note, ...rest } = parsed.data
 
+  // Si un point est fourni, vérifier qu'il appartient bien à l'utilisateur
+  if (point_de_vente_id) {
+    const { data: pdv } = await supabase
+      .from('points_de_vente')
+      .select('id')
+      .eq('id', point_de_vente_id)
+      .eq('proprietaire_id', user.id)
+      .single()
+    if (!pdv) return { error: 'Point de vente non autorisé' }
+  }
+
   const { error } = await supabase.from('depenses').insert({
     ...rest,
     point_de_vente_id: point_de_vente_id || null,
-    note: note || null,
-    proprietaire_id: user.id,
+    note:              note || null,
+    proprietaire_id:   user.id,
   })
 
   if (error) return { error: error.message }
@@ -47,6 +63,9 @@ export async function modifierDepense(id: string, prevState: State, formData: Fo
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
+  const idResult = uuidSchema.safeParse(id)
+  if (!idResult.success) return { error: 'Identifiant invalide' }
+
   const raw = Object.fromEntries(formData)
   const parsed = DepenseSchema.safeParse(raw)
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Données invalides' }
@@ -56,8 +75,8 @@ export async function modifierDepense(id: string, prevState: State, formData: Fo
   const { error } = await supabase
     .from('depenses')
     .update({ ...rest, point_de_vente_id: point_de_vente_id || null, note: note || null })
-    .eq('id', id)
-    .eq('proprietaire_id', user.id)
+    .eq('id', idResult.data)
+    .eq('proprietaire_id', user.id) // ownership check
 
   if (error) return { error: error.message }
   revalidatePath('/dashboard/comptabilite')
@@ -69,11 +88,14 @@ export async function supprimerDepense(id: string): Promise<State> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
 
+  const idResult = uuidSchema.safeParse(id)
+  if (!idResult.success) return { error: 'Identifiant invalide' }
+
   const { error } = await supabase
     .from('depenses')
     .delete()
-    .eq('id', id)
-    .eq('proprietaire_id', user.id)
+    .eq('id', idResult.data)
+    .eq('proprietaire_id', user.id) // ownership check
 
   if (error) return { error: error.message }
   revalidatePath('/dashboard/comptabilite')
@@ -88,18 +110,29 @@ export async function sauvegarderTauxCommission(prevState: State, formData: Form
   const entries: Array<{ reseau_id: string; taux_depot: number; taux_retrait: number }> = []
 
   formData.forEach((value, key) => {
-    const m = key.match(/^(depot|retrait)_(.+)$/)
+    // Clé strictement de la forme depot_<uuid> ou retrait_<uuid>
+    const m = key.match(/^(depot|retrait)_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i)
     if (!m) return
+
     const [, type, reseauId] = m
+
+    // Valider le taux
+    const tauxPct = parseFloat(String(value))
+    const tauxResult = TauxSchema.safeParse({ taux: tauxPct })
+    if (!tauxResult.success) return // ignorer les valeurs hors-bornes
+
+    const val = tauxPct / 100
+
     let entry = entries.find(e => e.reseau_id === reseauId)
     if (!entry) {
       entry = { reseau_id: reseauId, taux_depot: 0, taux_retrait: 0 }
       entries.push(entry)
     }
-    const val = parseFloat(String(value)) / 100  // convertir % → décimal
-    if (type === 'depot')   entry.taux_depot   = isNaN(val) ? 0 : val
-    if (type === 'retrait') entry.taux_retrait  = isNaN(val) ? 0 : val
+    if (type === 'depot')   entry.taux_depot   = val
+    if (type === 'retrait') entry.taux_retrait  = val
   })
+
+  if (entries.length === 0) return { error: 'Aucun taux valide fourni' }
 
   const rows = entries.map(e => ({ ...e, proprietaire_id: user.id }))
 

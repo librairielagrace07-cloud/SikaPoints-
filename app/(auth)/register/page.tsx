@@ -34,6 +34,7 @@ export default function RegisterPage() {
             name="nom_complet"
             type="text"
             required
+            maxLength={100}
             className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Jean-Luc Konan"
           />
@@ -47,6 +48,8 @@ export default function RegisterPage() {
             id="telephone"
             name="telephone"
             type="tel"
+            maxLength={20}
+            pattern="[\d\s\+\-\(\)\.]+"
             className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="+225 07 00 00 00 00"
           />
@@ -79,6 +82,7 @@ export default function RegisterPage() {
               type={showPwd ? 'text' : 'password'}
               required
               minLength={6}
+              maxLength={100}
               autoComplete="new-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -107,6 +111,7 @@ export default function RegisterPage() {
               name="confirm_password"
               type={showConfirm ? 'text' : 'password'}
               required
+              maxLength={100}
               autoComplete="new-password"
               value={confirm}
               onChange={e => setConfirm(e.target.value)}
