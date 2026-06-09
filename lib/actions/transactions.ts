@@ -6,13 +6,17 @@ import { z } from 'zod'
 import { getLimits } from '@/lib/plan-limits'
 import { uuidSchema, montantSchema, safeText } from '@/lib/validation'
 
+import { telephoneSchema } from '@/lib/validation'
+
 const TransactionSchema = z.object({
-  type:              z.enum(['RETRAIT', 'DEPOT']),
-  montant:           montantSchema,
-  reseau_id:         uuidSchema,
-  point_de_vente_id: uuidSchema,
-  agent_id:          uuidSchema.optional(),
-  note:              safeText(0, 500, 'Note').optional().or(z.literal('')).optional(),
+  type:                   z.enum(['RETRAIT', 'DEPOT']),
+  montant:                montantSchema,
+  reseau_id:              uuidSchema,
+  point_de_vente_id:      uuidSchema,
+  agent_id:               uuidSchema.optional(),
+  note:                   safeText(0, 500, 'Note').optional().or(z.literal('')).optional(),
+  telephone_client:       telephoneSchema.optional().or(z.literal('')).optional(),
+  reference_transaction:  safeText(0, 100, 'Référence').optional().or(z.literal('')).optional(),
 })
 
 export type ActionState = { error?: string; success?: boolean }
@@ -23,12 +27,14 @@ export async function enregistrerTransaction(prevState: ActionState, formData: F
   if (!user) return { error: 'Non authentifié' }
 
   const raw = {
-    type:              formData.get('type') as string,
-    montant:           Number(formData.get('montant')),
-    reseau_id:         formData.get('reseau_id') as string,
-    point_de_vente_id: formData.get('point_de_vente_id') as string,
-    agent_id:          (formData.get('agent_id') as string) || undefined,
-    note:              (formData.get('note') as string) || undefined,
+    type:                   formData.get('type') as string,
+    montant:                Number(formData.get('montant')),
+    reseau_id:              formData.get('reseau_id') as string,
+    point_de_vente_id:      formData.get('point_de_vente_id') as string,
+    agent_id:               (formData.get('agent_id') as string)              || undefined,
+    note:                   (formData.get('note') as string)                  || undefined,
+    telephone_client:       (formData.get('telephone_client') as string)      || undefined,
+    reference_transaction:  (formData.get('reference_transaction') as string) || undefined,
   }
 
   const parsed = TransactionSchema.safeParse(raw)
@@ -78,8 +84,10 @@ export async function enregistrerTransaction(prevState: ActionState, formData: F
 
   const { error } = await supabase.from('transactions').insert({
     ...parsed.data,
-    agent_id: parsed.data.agent_id || null,
-    note:     parsed.data.note     || null,
+    agent_id:              parsed.data.agent_id              || null,
+    note:                  parsed.data.note                  || null,
+    telephone_client:      parsed.data.telephone_client      || null,
+    reference_transaction: parsed.data.reference_transaction || null,
   })
 
   if (error) return { error: error.message }

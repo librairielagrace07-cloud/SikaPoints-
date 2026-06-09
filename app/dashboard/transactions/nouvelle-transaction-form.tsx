@@ -23,14 +23,19 @@ interface Props {
 export default function NouvelleTransactionForm({
   points, reseaux, peut_deposer, peut_retirer, point_de_vente_fixe, agent_id_fixe,
 }: Props) {
-  const [open,          setOpen]          = useState(false)
-  const [state, action, pending]          = useActionState(enregistrerTransaction, {})
-  const [selectedPoint, setSelectedPoint] = useState(point_de_vente_fixe ?? '')
-  const [agents,        setAgents]        = useState<Agent[]>([])
-  const [offlineQueued, setOfflineQueued] = useState(false)
+  const [open,           setOpen]          = useState(false)
+  const [state, action, pending]           = useActionState(enregistrerTransaction, {})
+  const [selectedPoint,  setSelectedPoint] = useState(point_de_vente_fixe ?? '')
+  const [selectedReseau, setSelectedReseau] = useState('')
+  const [agents,         setAgents]        = useState<Agent[]>([])
+  const [offlineQueued,  setOfflineQueued] = useState(false)
   const { isOnline, refreshCount } = useOffline()
 
   const defaultType = peut_deposer ? 'DEPOT' : 'RETRAIT'
+
+  // Réseau actuellement sélectionné (objet complet)
+  const reseauChoisi = reseaux.find(r => r.id === selectedReseau) ?? null
+  const isWave = reseauChoisi?.nom?.toLowerCase() === 'wave'
 
   useEffect(() => {
     if (!selectedPoint) return
@@ -55,14 +60,14 @@ export default function NouvelleTransactionForm({
     if (!navigator.onLine) {
       try {
         await addPendingTx({
-          localId:           crypto.randomUUID(),
-          point_de_vente_id: fd.get('point_de_vente_id') as string,
-          reseau_id:         fd.get('reseau_id') as string,
-          type:              fd.get('type') as 'DEPOT' | 'RETRAIT',
-          montant:           Number(fd.get('montant')),
-          note:              (fd.get('note') as string) || null,
-          agent_id:          (fd.get('agent_id') as string) || null,
-          created_at:        new Date().toISOString(),
+          localId:               crypto.randomUUID(),
+          point_de_vente_id:     fd.get('point_de_vente_id') as string,
+          reseau_id:             fd.get('reseau_id') as string,
+          type:                  fd.get('type') as 'DEPOT' | 'RETRAIT',
+          montant:               Number(fd.get('montant')),
+          note:                  (fd.get('note') as string) || null,
+          agent_id:              (fd.get('agent_id') as string) || null,
+          created_at:            new Date().toISOString(),
         })
         setOfflineQueued(true)
         await refreshCount()
@@ -73,7 +78,6 @@ export default function NouvelleTransactionForm({
       return
     }
 
-    // En ligne → server action normale
     startTransition(() => action(fd))
   }
 
@@ -180,14 +184,22 @@ export default function NouvelleTransactionForm({
                 </div>
               )}
 
+              {/* Réseau */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Réseau *</label>
-                <select name="reseau_id" required className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select
+                  name="reseau_id"
+                  required
+                  value={selectedReseau}
+                  onChange={e => setSelectedReseau(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
                   <option value="">Choisir un réseau</option>
                   {reseaux.map(r => <option key={r.id} value={r.id}>{r.nom}</option>)}
                 </select>
               </div>
 
+              {/* Montant */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Montant (FCFA) *</label>
                 <input
@@ -201,6 +213,42 @@ export default function NouvelleTransactionForm({
                 />
               </div>
 
+              {/* Téléphone client — masqué pour Wave */}
+              {!isWave && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Numéro de téléphone client
+                  </label>
+                  <input
+                    name="telephone_client"
+                    type="tel"
+                    maxLength={20}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ex: 07 00 00 00 00"
+                  />
+                </div>
+              )}
+
+              {/* Référence / ID de transaction */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ID de transaction
+                  {reseauChoisi && (
+                    <span className="ml-1 text-gray-400 font-normal text-xs">
+                      ({reseauChoisi.nom})
+                    </span>
+                  )}
+                </label>
+                <input
+                  name="reference_transaction"
+                  type="text"
+                  maxLength={100}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: TXN-1234567890"
+                />
+              </div>
+
+              {/* Agent */}
               {agent_id_fixe ? (
                 <input type="hidden" name="agent_id" value={agent_id_fixe} />
               ) : (
@@ -215,6 +263,7 @@ export default function NouvelleTransactionForm({
                 )
               )}
 
+              {/* Note */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
                 <input
