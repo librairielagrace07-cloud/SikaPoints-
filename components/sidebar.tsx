@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { logout } from '@/lib/actions/auth'
 import Logo from '@/components/ui/logo'
 import type { UserPermissions } from '@/lib/permissions'
+import { getLimits } from '@/lib/plan-limits'
 
 interface SidebarProps {
   nomUtilisateur: string
@@ -38,6 +39,7 @@ export default function Sidebar({ nomUtilisateur, avatarUrl, notificationsNonLue
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const estProprietaire = permissions.role === 'PROPRIETAIRE'
+  const planLimits = getLimits(permissions.plan)
 
   // Persist collapse state
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function Sidebar({ nomUtilisateur, avatarUrl, notificationsNonLue
     { href: '/dashboard/agents', label: 'Agents', icon: Users, visible: estProprietaire },
     { href: '/dashboard/transactions', label: 'Transactions', icon: ArrowLeftRight, visible: true },
     { href: '/dashboard/rapports', label: 'Rapports', icon: BarChart3, visible: estProprietaire || permissions.peut_voir_rapports },
-    { href: '/dashboard/comptabilite', label: 'Comptabilité', icon: BookOpen, visible: estProprietaire },
+    { href: '/dashboard/comptabilite', label: 'Comptabilité', icon: BookOpen, visible: estProprietaire && planLimits.comptabilite },
     { href: '/dashboard/notifications', label: 'Notifications', icon: Bell, visible: estProprietaire },
     { href: '/dashboard/parametres', label: 'Paramètres', icon: Settings, visible: true },
   ].filter(item => item.visible)

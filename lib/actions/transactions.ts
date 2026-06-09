@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { getLimits } from '@/lib/plan-limits'
 
 const TransactionSchema = z.object({
   type: z.enum(['RETRAIT', 'DEPOT']),
@@ -31,6 +32,34 @@ export async function enregistrerTransaction(prevState: ActionState, formData: F
 
   const parsed = TransactionSchema.safeParse(raw)
   if (!parsed.success) return { error: parsed.error.issues[0].message }
+
+  // Vérifier la limite mensuelle du plan (Starter : 50/mois)
+  const { data: pdv } = await supabase
+    .from('points_de_vente')
+    .select('proprietaire_id')
+    .eq('id', parsed.data.point_de_vente_id)
+    .single()
+  if (pdv?.proprietaire_id) {
+    const ownerId = pdv.proprietaire_id as string
+    const { data: profilPdv } = await supabase.from('profils').select('plan').eq('id', ownerId).single()
+    const limits = getLimits((profilPdv as { plan: string | null } | null)?.plan)
+    if (limits.maxTransactionsParMois > 0) {
+      const now = new Date()
+      const debutMois = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+      const { data: allPoints } = await supabase.from('points_de_vente').select('id').eq('proprietaire_id', ownerId)
+      const allIds = (allPoints ?? []).map(p => (p as { id: string }).id)
+      const { count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .in('point_de_vente_id', allIds.length > 0 ? allIds : ['none'])
+        .gte('created_at', debutMois)
+      if ((count ?? 0) >= limits.maxTransactionsParMois) {
+        return {
+          error: `Limite de ${limits.maxTransactionsParMois} transactions par mois atteinte (plan Starter). Passez au plan supérieur dans Paramètres → Abonnement.`,
+        }
+      }
+    }
+  }
 
   const { error } = await supabase.from('transactions').insert({
     ...parsed.data,

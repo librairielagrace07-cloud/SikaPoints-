@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { getLimits, getPlanLabel } from '@/lib/plan-limits'
 
 const PointSchema = z.object({
   nom: z.string().min(2, 'Nom requis'),
@@ -17,6 +18,22 @@ export async function creerPoint(prevState: ActionState, formData: FormData): Pr
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Non authentifié' }
+
+  // Vérifier la limite du plan
+  const { data: profil } = await supabase.from('profils').select('plan').eq('id', user.id).single()
+  const plan = (profil as { plan: string | null } | null)?.plan
+  const limits = getLimits(plan)
+  if (limits.maxPoints < 999) {
+    const { count } = await supabase
+      .from('points_de_vente')
+      .select('*', { count: 'exact', head: true })
+      .eq('proprietaire_id', user.id)
+    if ((count ?? 0) >= limits.maxPoints) {
+      return {
+        error: `Plan ${getPlanLabel(plan)} : maximum ${limits.maxPoints} point(s) de vente. Passez au plan supérieur dans Paramètres → Abonnement.`,
+      }
+    }
+  }
 
   const parsed = PointSchema.safeParse({
     nom: formData.get('nom'),

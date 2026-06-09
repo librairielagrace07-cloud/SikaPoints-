@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
+import { getLimits, getPlanLabel } from '@/lib/plan-limits'
 
 export type ActionState = { error?: string; success?: boolean }
 
@@ -39,6 +40,25 @@ export async function creerCompteAgent(prevState: ActionState, formData: FormDat
     .single()
 
   if (!point) return { error: 'Point de vente introuvable ou non autorisé' }
+
+  // Vérifier la limite d'agents du plan
+  const { data: profil } = await supabase.from('profils').select('plan').eq('id', user.id).single()
+  const plan = (profil as { plan: string | null } | null)?.plan
+  const limits = getLimits(plan)
+  if (limits.maxAgents < 999) {
+    const { data: allPoints } = await supabase.from('points_de_vente').select('id').eq('proprietaire_id', user.id)
+    const allIds = (allPoints ?? []).map(p => (p as { id: string }).id)
+    const { count } = await supabase
+      .from('agents')
+      .select('*', { count: 'exact', head: true })
+      .in('point_de_vente_id', allIds.length > 0 ? allIds : ['none'])
+      .eq('actif', true)
+    if ((count ?? 0) >= limits.maxAgents) {
+      return {
+        error: `Plan ${getPlanLabel(plan)} : maximum ${limits.maxAgents} agent(s) actif(s). Passez au plan supérieur dans Paramètres → Abonnement.`,
+      }
+    }
+  }
 
   const raw = {
     nom_complet: formData.get('nom_complet') as string,

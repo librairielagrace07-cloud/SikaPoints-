@@ -6,11 +6,12 @@ export default async function RapportsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: points } = await supabase
-    .from('points_de_vente')
-    .select('id, nom')
-    .eq('proprietaire_id', user!.id)
+  const [{ data: points }, { data: profil }] = await Promise.all([
+    supabase.from('points_de_vente').select('id, nom').eq('proprietaire_id', user!.id),
+    supabase.from('profils').select('plan').eq('id', user!.id).single(),
+  ])
 
+  const plan = (profil as { plan: string | null } | null)?.plan ?? 'starter'
   const pointIds = (points as Array<{ id: string }> | null)?.map(p => p.id) ?? []
 
   // Charger 12 mois — le filtrage par période se fait côté client
@@ -36,6 +37,7 @@ export default async function RapportsPage() {
         transactions={(rawTransactions ?? []) as unknown as Parameters<typeof RapportsClient>[0]['transactions']}
         reseaux={(rawReseaux ?? []) as unknown as Parameters<typeof RapportsClient>[0]['reseaux']}
         points={(points ?? []) as Array<{ id: string; nom: string }>}
+        plan={plan}
       />
     </div>
   )

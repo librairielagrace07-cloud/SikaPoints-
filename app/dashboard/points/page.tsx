@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import NouveauPointForm from './nouveau-point-form'
 import PointsView from './points-view'
+import { getLimits, getPlanLabel } from '@/lib/plan-limits'
 
 export interface PointStat {
   id: string
@@ -20,6 +21,11 @@ export interface PointStat {
 export default async function PointsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Plan de l'utilisateur
+  const { data: profil } = await supabase.from('profils').select('plan').eq('id', user!.id).single()
+  const plan = (profil as { plan: string | null } | null)?.plan
+  const limits = getLimits(plan)
 
   // Points avec UV et agents
   const { data: points } = await supabase
@@ -86,14 +92,23 @@ export default async function PointsPage() {
     }
   })
 
+  const atLimit = limits.maxPoints < 999 && stats.length >= limits.maxPoints
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Points de vente</h1>
-          <p className="text-gray-500 text-sm mt-1">{stats.length} point(s) configuré(s)</p>
+          <p className="text-gray-500 text-sm mt-1">
+            {stats.length} point(s) configuré(s)
+            {limits.maxPoints < 999 && (
+              <span className={`ml-2 font-medium ${atLimit ? 'text-amber-600' : 'text-gray-400'}`}>
+                · {stats.length}/{limits.maxPoints} ({getPlanLabel(plan)})
+              </span>
+            )}
+          </p>
         </div>
-        <NouveauPointForm />
+        <NouveauPointForm atLimit={atLimit} maxPoints={limits.maxPoints} />
       </div>
 
       <PointsView stats={stats} />

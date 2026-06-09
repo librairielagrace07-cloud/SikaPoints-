@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export interface UserPermissions {
   role: 'PROPRIETAIRE' | 'AGENT'
+  plan: string
   peut_deposer: boolean
   peut_retirer: boolean
   peut_voir_rapports: boolean
@@ -11,6 +12,7 @@ export interface UserPermissions {
 
 const AGENT_NO_ACCESS: UserPermissions = {
   role: 'AGENT',
+  plan: 'starter',
   peut_deposer: false,
   peut_retirer: false,
   peut_voir_rapports: false,
@@ -30,15 +32,17 @@ export async function getUserPermissions(userId?: string): Promise<UserPermissio
 
   const { data: profil } = await supabase
     .from('profils')
-    .select('role')
+    .select('role, plan')
     .eq('id', uid)
     .single()
 
-  const role = (profil as { role: string } | null)?.role as 'PROPRIETAIRE' | 'AGENT' | undefined
+  const p = profil as { role: string; plan: string | null } | null
+  const role = p?.role as 'PROPRIETAIRE' | 'AGENT' | undefined
 
   if (role === 'PROPRIETAIRE') {
     return {
       role: 'PROPRIETAIRE',
+      plan: p?.plan ?? 'starter',
       peut_deposer: true,
       peut_retirer: true,
       peut_voir_rapports: true,
@@ -67,6 +71,7 @@ export async function getUserPermissions(userId?: string): Promise<UserPermissio
 
   return {
     role: 'AGENT',
+    plan: 'starter',
     peut_deposer: a.peut_deposer,
     peut_retirer: a.peut_retirer,
     peut_voir_rapports: a.peut_voir_rapports,

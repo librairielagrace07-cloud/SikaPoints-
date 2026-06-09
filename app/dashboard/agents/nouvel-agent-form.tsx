@@ -2,9 +2,16 @@
 
 import { useActionState, useState } from 'react'
 import { creerCompteAgent } from '@/lib/actions/agents'
-import { Plus, X, Eye, EyeOff } from 'lucide-react'
+import { Plus, X, Eye, EyeOff, Lock } from 'lucide-react'
+import Link from 'next/link'
 
 interface Point { id: string; nom: string }
+
+interface Props {
+  points: Point[]
+  atLimit: boolean
+  maxAgents: number
+}
 
 const PERMISSIONS = [
   { key: 'peut_deposer', label: 'Faire des dépôts', defaultOn: true },
@@ -13,10 +20,22 @@ const PERMISSIONS = [
   { key: 'peut_modifier_uv', label: 'Modifier l\'UV manuellement', defaultOn: false },
 ]
 
-export default function NouvelAgentForm({ points }: { points: Point[] }) {
+export default function NouvelAgentForm({ points, atLimit, maxAgents }: Props) {
   const [open, setOpen] = useState(false)
   const [showMdp, setShowMdp] = useState(false)
   const [state, action, pending] = useActionState(creerCompteAgent, {})
+
+  if (atLimit) {
+    return (
+      <Link
+        href="/dashboard/parametres?onglet=abonnement"
+        className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100 transition-colors"
+      >
+        <Lock className="w-4 h-4" />
+        Limite atteinte ({maxAgents} max)
+      </Link>
+    )
+  }
 
   return (
     <>

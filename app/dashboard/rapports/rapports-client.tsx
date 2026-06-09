@@ -12,7 +12,9 @@ import {
   subDays, subMonths, isWithinInterval, endOfDay,
 } from 'date-fns'
 import { fr } from 'date-fns/locale'
-import { FileDown, FileSpreadsheet, CalendarDays, Loader2, Store } from 'lucide-react'
+import { FileDown, FileSpreadsheet, CalendarDays, Loader2, Store, Lock } from 'lucide-react'
+import { getLimits } from '@/lib/plan-limits'
+import Link from 'next/link'
 
 type Periode = 'jour' | 'semaine' | 'mois'
 type QuickRange = '7j' | '30j' | '3m' | '6m' | '12m' | 'custom'
@@ -86,11 +88,15 @@ export default function RapportsClient({
   transactions,
   reseaux,
   points,
+  plan,
 }: {
   transactions: Transaction[]
   reseaux: Reseau[]
   points: Point[]
+  plan: string
 }) {
+  const planLimits = getLimits(plan)
+  const peutExporter = planLimits.exportsPDF || planLimits.exportsExcel
   const [periode,         setPeriode]         = useState<Periode>('jour')
   const [quickRange,      setQuickRange]      = useState<QuickRange>('30j')
   const [dateDebut,       setDateDebut]       = useState(() => format(subDays(new Date(), 29), 'yyyy-MM-dd'))
@@ -276,58 +282,70 @@ export default function RapportsClient({
 
           {/* Boutons export */}
           <div className="flex flex-col gap-1.5 items-end">
-            {/* Export global */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 font-medium">Rapport global</span>
-              <button
-                onClick={handleExportExcel}
-                disabled={exporting !== null || filtered.length === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-green-200 text-green-700 rounded-lg text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
+            {!peutExporter ? (
+              <Link
+                href="/dashboard/parametres?onglet=abonnement"
+                className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100 transition-colors"
               >
-                {exporting === 'excel' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                Excel
-              </button>
-              <button
-                onClick={handleExportPDF}
-                disabled={exporting !== null || filtered.length === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {exporting === 'pdf' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-                PDF
-              </button>
-            </div>
-
-            {/* Export par point */}
-            {points.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap justify-end">
-                <span className="text-xs text-gray-400 font-medium">Par point</span>
-                <div className="flex items-center gap-1">
-                  <Store className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                  <select
-                    value={selectedPointId}
-                    onChange={e => setSelectedPointId(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white max-w-45"
+                <Lock className="w-3.5 h-3.5" />
+                Exports PDF/Excel — plan Solo requis
+              </Link>
+            ) : (
+              <>
+                {/* Export global */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 font-medium">Rapport global</span>
+                  <button
+                    onClick={handleExportExcel}
+                    disabled={exporting !== null || filtered.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-green-200 text-green-700 rounded-lg text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
                   >
-                    {points.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
-                  </select>
+                    {exporting === 'excel' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                    Excel
+                  </button>
+                  <button
+                    onClick={handleExportPDF}
+                    disabled={exporting !== null || filtered.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {exporting === 'pdf' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                    PDF
+                  </button>
                 </div>
-                <button
-                  onClick={handlePointExcel}
-                  disabled={exportingPoint !== null || !pointRapportData || pointRapportData.nbTransactions === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-green-200 text-green-700 rounded-lg text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
-                >
-                  {exportingPoint === 'excel' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                  Excel
-                </button>
-                <button
-                  onClick={handlePointPDF}
-                  disabled={exportingPoint !== null || !pointRapportData || pointRapportData.nbTransactions === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {exportingPoint === 'pdf' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-                  PDF
-                </button>
-              </div>
+
+                {/* Export par point */}
+                {points.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <span className="text-xs text-gray-400 font-medium">Par point</span>
+                    <div className="flex items-center gap-1">
+                      <Store className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <select
+                        value={selectedPointId}
+                        onChange={e => setSelectedPointId(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white max-w-45"
+                      >
+                        {points.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
+                      </select>
+                    </div>
+                    <button
+                      onClick={handlePointExcel}
+                      disabled={exportingPoint !== null || !pointRapportData || pointRapportData.nbTransactions === 0}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-green-200 text-green-700 rounded-lg text-sm font-medium hover:bg-green-50 disabled:opacity-50 transition-colors"
+                    >
+                      {exportingPoint === 'excel' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                      Excel
+                    </button>
+                    <button
+                      onClick={handlePointPDF}
+                      disabled={exportingPoint !== null || !pointRapportData || pointRapportData.nbTransactions === 0}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {exportingPoint === 'pdf' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                      PDF
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

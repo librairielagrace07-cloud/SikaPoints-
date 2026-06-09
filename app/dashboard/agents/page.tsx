@@ -1,11 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
-import { Users, Phone, Store } from 'lucide-react'
+import { Users, Store } from 'lucide-react'
 import NouvelAgentForm from './nouvel-agent-form'
 import AgentCard from './agent-card'
+import { getLimits, getPlanLabel } from '@/lib/plan-limits'
 
 export default async function AgentsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Plan de l'utilisateur
+  const { data: profil } = await supabase.from('profils').select('plan').eq('id', user!.id).single()
+  const plan = (profil as { plan: string | null } | null)?.plan
+  const limits = getLimits(plan)
 
   const { data: points } = await supabase
     .from('points_de_vente')
@@ -33,16 +39,25 @@ export default async function AgentsPage() {
   }>
 
   const typedPoints = (points ?? []) as Array<{ id: string; nom: string }>
+  const agentsActifs = agents.filter(a => a.actif).length
+  const atLimit = limits.maxAgents < 999 && agentsActifs >= limits.maxAgents
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Agents</h1>
-          <p className="text-gray-500 text-sm mt-1">{agents.length} agent(s)</p>
+          <p className="text-gray-500 text-sm mt-1">
+            {agents.length} agent(s)
+            {limits.maxAgents < 999 && (
+              <span className={`ml-2 font-medium ${atLimit ? 'text-amber-600' : 'text-gray-400'}`}>
+                · {agentsActifs}/{limits.maxAgents} actif(s) ({getPlanLabel(plan)})
+              </span>
+            )}
+          </p>
         </div>
         {typedPoints.length > 0 && (
-          <NouvelAgentForm points={typedPoints} />
+          <NouvelAgentForm points={typedPoints} atLimit={atLimit} maxAgents={limits.maxAgents} />
         )}
       </div>
 

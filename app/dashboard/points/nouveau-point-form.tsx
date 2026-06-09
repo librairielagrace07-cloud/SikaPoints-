@@ -2,11 +2,29 @@
 
 import { useActionState, useState } from 'react'
 import { creerPoint } from '@/lib/actions/points'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, Lock } from 'lucide-react'
+import Link from 'next/link'
 
-export default function NouveauPointForm() {
+interface Props {
+  atLimit: boolean
+  maxPoints: number
+}
+
+export default function NouveauPointForm({ atLimit, maxPoints }: Props) {
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useActionState(creerPoint, {})
+
+  if (atLimit) {
+    return (
+      <Link
+        href="/dashboard/parametres?onglet=abonnement"
+        className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100 transition-colors"
+      >
+        <Lock className="w-4 h-4" />
+        Limite atteinte ({maxPoints} max)
+      </Link>
+    )
+  }
 
   return (
     <>
