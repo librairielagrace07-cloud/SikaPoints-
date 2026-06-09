@@ -12,7 +12,7 @@ export default async function AdminUtilisateursPage() {
     { data: agents },
   ] = await Promise.all([
     admin.auth.admin.listUsers({ perPage: 1000 }),
-    admin.from('profils').select('id, nom_complet, is_super_admin, plan, created_at').eq('role', 'PROPRIETAIRE').order('created_at', { ascending: false }),
+    admin.from('profils').select('id, nom_complet, is_super_admin, plan, plan_fin, created_at').eq('role', 'PROPRIETAIRE').order('created_at', { ascending: false }),
     admin.from('points_de_vente').select('id, proprietaire_id'),
     admin.from('agents').select('id, point_de_vente_id').eq('actif', true),
   ])
@@ -21,7 +21,6 @@ export default async function AdminUtilisateursPage() {
 
   const emailByUserId = new Map(authUsers.map(u => [u.id, u.email ?? '—']))
 
-  // Points par propriétaire
   const nbPointsByProprio = new Map<string, number>()
   const pointOwner = new Map<string, string>()
   for (const p of (points ?? [])) {
@@ -30,7 +29,6 @@ export default async function AdminUtilisateursPage() {
     nbPointsByProprio.set(pdv.proprietaire_id, (nbPointsByProprio.get(pdv.proprietaire_id) ?? 0) + 1)
   }
 
-  // Agents par propriétaire (via les points de vente)
   const agentsCountByProprio = new Map<string, number>()
   for (const a of (agents ?? [])) {
     const ag = a as { point_de_vente_id: string }
@@ -61,7 +59,7 @@ export default async function AdminUtilisateursPage() {
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nom</th>
                 <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Plan</th>
+                <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Plan & Expiration</th>
                 <th className="text-center px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Points</th>
                 <th className="text-center px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Agents</th>
                 <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Inscrit le</th>
@@ -76,7 +74,7 @@ export default async function AdminUtilisateursPage() {
                 </tr>
               )}
               {profils.map(
-                (u: { id: string; nom_complet: string; plan: string; created_at: string }) => {
+                (u: { id: string; nom_complet: string; plan: string; plan_fin: string | null; created_at: string }) => {
                   const nbPoints = nbPointsByProprio.get(u.id) ?? 0
                   const nbAgents = agentsCountByProprio.get(u.id) ?? 0
                   return (
@@ -91,7 +89,11 @@ export default async function AdminUtilisateursPage() {
                       </td>
                       <td className="px-6 py-4 text-gray-500 text-xs">{emailByUserId.get(u.id) ?? '—'}</td>
                       <td className="px-6 py-4">
-                        <PlanSelector userId={u.id} planActuel={u.plan ?? 'starter'} />
+                        <PlanSelector
+                          userId={u.id}
+                          planActuel={u.plan ?? 'starter'}
+                          planFinActuel={u.plan_fin ?? null}
+                        />
                       </td>
                       <td className="px-6 py-4 text-center font-semibold text-gray-700">{nbPoints}</td>
                       <td className="px-6 py-4 text-center text-gray-500">{nbAgents}</td>

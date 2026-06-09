@@ -22,7 +22,11 @@ async function assertSuperAdmin() {
   }
 }
 
-export async function changerPlan(userId: string, plan: string): Promise<void> {
+export async function changerPlan(
+  userId: string,
+  plan: string,
+  planFin: string | null = null,
+): Promise<void> {
   await assertSuperAdmin()
 
   if (!VALID_PLANS.includes(plan as typeof VALID_PLANS[number])) {
@@ -30,8 +34,13 @@ export async function changerPlan(userId: string, plan: string): Promise<void> {
   }
 
   const admin = createAdminClient()
-  const { error } = await admin.from('profils').update({ plan }).eq('id', userId)
+  const { error } = await admin.from('profils').update({
+    plan,
+    plan_debut: new Date().toISOString(),
+    plan_fin: planFin,
+  }).eq('id', userId)
   if (error) throw new Error(error.message)
 
   revalidatePath('/admin/utilisateurs')
+  revalidatePath('/admin/abonnements')
 }
