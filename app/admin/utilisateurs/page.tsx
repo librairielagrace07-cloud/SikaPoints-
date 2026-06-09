@@ -1,16 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { UserCheck } from 'lucide-react'
-
-const PLAN_BADGE: Record<string, string> = {
-  starter:    'bg-gray-100 text-gray-600',
-  solo:       'bg-blue-100 text-blue-700',
-  croissance: 'bg-green-100 text-green-700',
-  business:   'bg-purple-100 text-purple-700',
-}
-
-const PLAN_LABEL: Record<string, string> = {
-  starter: 'Starter', solo: 'Solo', croissance: 'Croissance', business: 'Business',
-}
+import PlanSelector from './plan-selector'
 
 export default async function AdminUtilisateursPage() {
   const admin = createAdminClient()
@@ -87,12 +77,10 @@ export default async function AdminUtilisateursPage() {
               )}
               {profils.map(
                 (u: { id: string; nom_complet: string; plan: string; created_at: string }) => {
-                  const badgeClass = PLAN_BADGE[u.plan] ?? PLAN_BADGE.starter
-                  const label = PLAN_LABEL[u.plan] ?? u.plan
                   const nbPoints = nbPointsByProprio.get(u.id) ?? 0
                   const nbAgents = agentsCountByProprio.get(u.id) ?? 0
                   return (
-                    <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={u.id} className="hover:bg-gray-50/60 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-linear-to-br from-green-400 to-green-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
@@ -103,9 +91,7 @@ export default async function AdminUtilisateursPage() {
                       </td>
                       <td className="px-6 py-4 text-gray-500 text-xs">{emailByUserId.get(u.id) ?? '—'}</td>
                       <td className="px-6 py-4">
-                        <span className={`inline-block text-xs font-medium px-2.5 py-0.5 rounded-full ${badgeClass}`}>
-                          {label}
-                        </span>
+                        <PlanSelector userId={u.id} planActuel={u.plan ?? 'starter'} />
                       </td>
                       <td className="px-6 py-4 text-center font-semibold text-gray-700">{nbPoints}</td>
                       <td className="px-6 py-4 text-center text-gray-500">{nbAgents}</td>
