@@ -4,14 +4,16 @@ import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
 // ── Palette ────────────────────────────────────────────────────────────────────
-const BLUE   = [37, 99, 235]   as [number, number, number]  // blue-600
-const BLUE2  = [219, 234, 254] as [number, number, number]  // blue-100
-const GRAY1  = [17, 24, 39]    as [number, number, number]  // gray-900
-const GRAY5  = [107, 114, 128] as [number, number, number]  // gray-500
-const GRAY9  = [249, 250, 251] as [number, number, number]  // gray-50
-const GREEN  = [22, 163, 74]   as [number, number, number]  // green-600
-const ORANGE = [234, 88, 12]   as [number, number, number]  // orange-600
+const BLUE   = [37, 99, 235]   as [number, number, number]
+const BLUE2  = [219, 234, 254] as [number, number, number]
+const GRAY1  = [17, 24, 39]    as [number, number, number]
+const GRAY5  = [107, 114, 128] as [number, number, number]
+const GRAY9  = [249, 250, 251] as [number, number, number]
+const GREEN  = [22, 163, 74]   as [number, number, number]
+const ORANGE = [234, 88, 12]   as [number, number, number]
 const WHITE  = [255, 255, 255] as [number, number, number]
+const INDIGO = [99, 102, 241]  as [number, number, number]
+const INDIGO2 = [224, 231, 255] as [number, number, number]
 
 export interface RapportData {
   dateDebut: Date
@@ -28,6 +30,21 @@ export interface RapportData {
     retraits: number
     nb: number
   }>
+  /** Présent uniquement dans le rapport global — absent dans le rapport par point */
+  parPoint?: Array<{
+    id: string
+    nom: string
+    depots: number
+    retraits: number
+    nb: number
+    parReseau: Array<{
+      nom: string
+      couleur: string
+      depots: number
+      retraits: number
+      nb: number
+    }>
+  }>
   transactions: Array<{
     date: string
     type: 'DEPOT' | 'RETRAIT'
@@ -35,11 +52,10 @@ export interface RapportData {
     montant: number
     point: string
   }>
-  nomPoint?: string   // si présent → rapport d'un point de vente spécifique
+  nomPoint?: string
 }
 
 function fmt(n: number) {
-  // Séparateur de milliers manuel pour éviter les espaces insécables de fr-FR
   const parts = Math.round(n).toString().split('')
   const intStr = parts.reduceRight<string[]>((acc, d, i, arr) => {
     acc.unshift(d)
@@ -61,7 +77,6 @@ export function generatePDF(data: RapportData) {
   const pageH = doc.internal.pageSize.getHeight()
   let y = 0
 
-  // ── Fonctions helpers ────────────────────────────────────────────────────────
   const addPageIfNeeded = (needed = 30) => {
     if (y + needed > pageH - 20) {
       doc.addPage()
@@ -71,17 +86,14 @@ export function generatePDF(data: RapportData) {
   }
 
   const drawPageHeader = () => {
-    // Bande bleue fine en haut de chaque page
     doc.setFillColor(...BLUE)
     doc.rect(0, 0, W, 8, 'F')
   }
 
-  // ── Page 1 ───────────────────────────────────────────────────────────────────
-  // En-tête principal
+  // ── En-tête principal ────────────────────────────────────────────────────────
   doc.setFillColor(...BLUE)
   doc.rect(0, 0, W, 42, 'F')
 
-  // Logo texte
   doc.setTextColor(...WHITE)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(22)
@@ -94,18 +106,16 @@ export function generatePDF(data: RapportData) {
     15, 28,
   )
 
-  // Période
   const periodeStr = `${format(data.dateDebut, 'dd MMMM yyyy', { locale: fr })} — ${format(data.dateFin, 'dd MMMM yyyy', { locale: fr })}`
   doc.setFontSize(9)
   doc.text(`Période : ${periodeStr}`, 15, 36)
 
-  // Date de génération (coin droit)
   doc.setFontSize(8)
   doc.text(`Généré le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })}`, W - 15, 36, { align: 'right' })
 
   y = 52
 
-  // ── Points de vente inclus ───────────────────────────────────────────────────
+  // ── Points inclus ────────────────────────────────────────────────────────────
   if (data.points.length > 0) {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
@@ -118,10 +128,10 @@ export function generatePDF(data: RapportData) {
   // ── Résumé (4 cartes) ────────────────────────────────────────────────────────
   const cardW = (W - 30) / 2
   const cards = [
-    { label: 'Total dépôts',      value: fmt(data.totalDepots),   color: GREEN },
-    { label: 'Total retraits',    value: fmt(data.totalRetraits),  color: ORANGE },
-    { label: 'Volume total',      value: fmt(data.totalDepots + data.totalRetraits), color: BLUE },
-    { label: 'Nb transactions',   value: String(data.nbTransactions), color: GRAY5 },
+    { label: 'Total dépôts',    value: fmt(data.totalDepots),                      color: GREEN  },
+    { label: 'Total retraits',  value: fmt(data.totalRetraits),                    color: ORANGE },
+    { label: 'Volume total',    value: fmt(data.totalDepots + data.totalRetraits), color: BLUE   },
+    { label: 'Nb transactions', value: String(data.nbTransactions),                color: GRAY5  },
   ]
 
   cards.forEach((card, i) => {
@@ -133,7 +143,6 @@ export function generatePDF(data: RapportData) {
     doc.setDrawColor(229, 231, 235)
     doc.roundedRect(cx, cy, cardW, 18, 2, 2, 'S')
 
-    // Barre colorée à gauche
     doc.setFillColor(...card.color)
     doc.roundedRect(cx, cy, 3, 18, 1, 1, 'F')
 
@@ -167,7 +176,6 @@ export function generatePDF(data: RapportData) {
       String(r.nb),
     ]),
     foot: [['TOTAL', fmt(data.totalDepots), fmt(data.totalRetraits), fmt(data.totalDepots + data.totalRetraits), String(data.nbTransactions)]],
-
     headStyles: { fillColor: BLUE, textColor: WHITE, fontStyle: 'bold', fontSize: 9 },
     footStyles: { fillColor: BLUE2, textColor: BLUE, fontStyle: 'bold', fontSize: 9 },
     bodyStyles: { fontSize: 9, textColor: GRAY1 },
@@ -185,6 +193,80 @@ export function generatePDF(data: RapportData) {
   })
 
   y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12
+
+  // ── Détail par point de vente (rapport global uniquement) ─────────────────────
+  if (data.parPoint && data.parPoint.length > 1) {
+    addPageIfNeeded(50)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(...GRAY1)
+    doc.text('Détail par point de vente', 15, y)
+    y += 4
+
+    // Sous-titre
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...GRAY5)
+    doc.text(`${data.parPoint.length} points de vente actifs sur la période`, 15, y + 4)
+    y += 10
+
+    for (const pt of data.parPoint) {
+      addPageIfNeeded(45)
+
+      // Bandeau du point
+      doc.setFillColor(...INDIGO2)
+      doc.roundedRect(15, y, W - 30, 12, 2, 2, 'F')
+      doc.setFillColor(...INDIGO)
+      doc.roundedRect(15, y, 4, 12, 1, 1, 'F')
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(...INDIGO)
+      doc.text(pt.nom, 24, y + 4.5)
+
+      // Résumé rapide sur la même ligne
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(...GRAY5)
+      doc.text(
+        `${pt.nb} transaction${pt.nb > 1 ? 's' : ''}   ·   Dépôts ${fmt(pt.depots)}   ·   Retraits ${fmt(pt.retraits)}   ·   Volume ${fmt(pt.depots + pt.retraits)}`,
+        24, y + 9,
+      )
+      y += 16
+
+      // Table par réseau pour ce point
+      if (pt.parReseau.length > 0) {
+        autoTable(doc, {
+          startY: y,
+          head: [['Réseau', 'Dépôts', 'Retraits', 'Volume', 'Tx']],
+          body: pt.parReseau.map(r => [
+            r.nom,
+            fmt(r.depots),
+            fmt(r.retraits),
+            fmt(r.depots + r.retraits),
+            String(r.nb),
+          ]),
+          foot: [['TOTAL', fmt(pt.depots), fmt(pt.retraits), fmt(pt.depots + pt.retraits), String(pt.nb)]],
+          headStyles: { fillColor: INDIGO, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
+          footStyles: { fillColor: INDIGO2, textColor: INDIGO, fontStyle: 'bold', fontSize: 8 },
+          bodyStyles: { fontSize: 8, textColor: GRAY1 },
+          alternateRowStyles: { fillColor: GRAY9 },
+          columnStyles: {
+            0: { fontStyle: 'bold' },
+            1: { halign: 'right', textColor: [22, 163, 74] },
+            2: { halign: 'right', textColor: [234, 88, 12] },
+            3: { halign: 'right', fontStyle: 'bold' },
+            4: { halign: 'center' },
+          },
+          margin: { left: 15, right: 15 },
+          tableLineColor: [229, 231, 235],
+          tableLineWidth: 0.1,
+        })
+        y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
+      }
+    }
+  }
 
   // ── Détail des transactions ───────────────────────────────────────────────────
   addPageIfNeeded(40)
@@ -207,7 +289,6 @@ export function generatePDF(data: RapportData) {
     startY: y,
     head: [['Date', 'Type', 'Réseau', 'Montant', 'Point de vente']],
     body: txRows,
-
     headStyles: { fillColor: BLUE, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
     bodyStyles: { fontSize: 8, textColor: GRAY1 },
     alternateRowStyles: { fillColor: GRAY9 },
@@ -234,7 +315,7 @@ export function generatePDF(data: RapportData) {
     tableLineWidth: 0.1,
   })
 
-  // ── Pied de page sur toutes les pages ─────────────────────────────────────────
+  // ── Pied de page ─────────────────────────────────────────────────────────────
   const totalPages = doc.getNumberOfPages()
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i)
@@ -247,7 +328,6 @@ export function generatePDF(data: RapportData) {
     doc.text(`Page ${i} / ${totalPages}`, W - 15, pageH - 3.5, { align: 'right' })
   }
 
-  // Téléchargement
   const slug     = data.nomPoint ? '_' + data.nomPoint.replace(/\s+/g, '_') : ''
   const filename = `SikaPoints_Rapport${slug}_${format(data.dateDebut, 'yyyyMMdd')}_${format(data.dateFin, 'yyyyMMdd')}.pdf`
   doc.save(filename)

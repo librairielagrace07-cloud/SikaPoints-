@@ -150,6 +150,41 @@ export default function RapportsClient({
     return Object.values(map).sort((a, b) => (b.depots + b.retraits) - (a.depots + a.retraits))
   }, [filtered, reseaux])
 
+  /** Synthèse par point de vente, pour le rapport global */
+  const parPoint = useMemo(() => {
+    const map: Record<string, {
+      id: string; nom: string; depots: number; retraits: number; nb: number
+      reseaux: Record<string, { depots: number; retraits: number; nb: number; reseau: Reseau }>
+    }> = {}
+    filtered.forEach(t => {
+      const pt = points.find(p => p.id === t.point_de_vente_id)
+      if (!pt) return
+      if (!map[pt.id]) map[pt.id] = { id: pt.id, nom: pt.nom, depots: 0, retraits: 0, nb: 0, reseaux: {} }
+      if (t.type === 'DEPOT') map[pt.id].depots += t.montant
+      else                    map[pt.id].retraits += t.montant
+      map[pt.id].nb++
+      const r = reseaux.find(r => r.id === t.reseau_id)
+      if (r) {
+        if (!map[pt.id].reseaux[r.id]) map[pt.id].reseaux[r.id] = { depots: 0, retraits: 0, nb: 0, reseau: r }
+        if (t.type === 'DEPOT') map[pt.id].reseaux[r.id].depots += t.montant
+        else                    map[pt.id].reseaux[r.id].retraits += t.montant
+        map[pt.id].reseaux[r.id].nb++
+      }
+    })
+    return Object.values(map)
+      .sort((a, b) => (b.depots + b.retraits) - (a.depots + a.retraits))
+      .map(pt => ({
+        id: pt.id,
+        nom: pt.nom,
+        depots: pt.depots,
+        retraits: pt.retraits,
+        nb: pt.nb,
+        parReseau: Object.values(pt.reseaux)
+          .sort((a, b) => (b.depots + b.retraits) - (a.depots + a.retraits))
+          .map(r => ({ nom: r.reseau.nom, couleur: r.reseau.couleur, depots: r.depots, retraits: r.retraits, nb: r.nb })),
+      }))
+  }, [filtered, points, reseaux])
+
   // ── Données export par point ──────────────────────────────────────────────
   const pointRapportData = useMemo(() => {
     const selectedPoint = points.find(p => p.id === selectedPointId)
@@ -203,6 +238,7 @@ export default function RapportsClient({
     totalRetraits,
     nbTransactions: filtered.length,
     parReseau: parReseau.map(r => ({ nom: r.reseau.nom, couleur: r.reseau.couleur, depots: r.depots, retraits: r.retraits, nb: r.nb })),
+    parPoint,
     transactions: filtered.map(t => ({
       date: t.created_at,
       type: t.type,
@@ -210,7 +246,7 @@ export default function RapportsClient({
       montant: t.montant,
       point: (t.points_de_vente as { nom: string })?.nom ?? '—',
     })),
-  }), [debut, fin, quickRange, dateDebut, dateFin, points, totalDepots, totalRetraits, filtered, parReseau])
+  }), [debut, fin, quickRange, dateDebut, dateFin, points, totalDepots, totalRetraits, filtered, parReseau, parPoint])
 
   const handleExportPDF = async () => {
     setExporting('pdf')
@@ -473,6 +509,77 @@ export default function RapportsClient({
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Par point de vente ───────────────────────────────────────────── */}
+      {parPoint.length > 1 && (
+        <div>
+          <h2 className="font-semibold text-gray-900 mb-3">Par point de vente</h2>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-indigo-600 text-white">
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide">Point de vente</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Dépôts</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Retraits</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Volume</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold uppercase tracking-wide">Tx</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Part</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {parPoint.map((pt, i) => {
+                  const vol = pt.depots + pt.retraits
+                  const totalVol = totalDepots + totalRetraits
+                  const pct = totalVol > 0 ? Math.round((vol / totalVol) * 100) : 0
+                  return (
+                    <tr key={pt.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                          <span className="font-medium text-gray-900">{pt.nom}</span>
+                        </div>
+                        {/* Détail mini par réseau */}
+                        {pt.parReseau.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 pl-4">
+                            {pt.parReseau.map(r => (
+                              <span key={r.nom} className="text-xs text-gray-400 flex items-center gap-1">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: r.couleur }} />
+                                {r.nom} {r.nb}tx
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-green-600 whitespace-nowrap">{formatMontant(pt.depots)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-orange-500 whitespace-nowrap">{formatMontant(pt.retraits)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">{formatMontant(vol)}</td>
+                      <td className="px-4 py-3 text-center text-gray-600">{pt.nb}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
+                            <div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-gray-500 font-medium">{pct}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-indigo-50 border-t-2 border-indigo-200">
+                  <td className="px-4 py-3 font-bold text-indigo-700 text-sm">TOTAL</td>
+                  <td className="px-4 py-3 text-right font-bold text-green-700 whitespace-nowrap">{formatMontant(totalDepots)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-orange-600 whitespace-nowrap">{formatMontant(totalRetraits)}</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">{formatMontant(totalDepots + totalRetraits)}</td>
+                  <td className="px-4 py-3 text-center font-bold text-gray-900">{filtered.length}</td>
+                  <td className="px-4 py-3 text-right font-bold text-indigo-700">100%</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
       )}
