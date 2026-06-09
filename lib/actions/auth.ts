@@ -103,8 +103,8 @@ export async function register(prevState: AuthState, formData: FormData): Promis
 
   if (error) return { error: error.message }
 
-  revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  // Ne pas rediriger : l'utilisateur doit d'abord confirmer son email
+  return { success: true }
 }
 
 export async function logout() {

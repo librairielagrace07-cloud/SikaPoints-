@@ -3,16 +3,54 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { register } from '@/lib/actions/auth'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, MailCheck } from 'lucide-react'
 
 export default function RegisterPage() {
   const [state, action, pending] = useActionState(register, {})
-  const [password, setPassword]     = useState('')
-  const [confirm, setConfirm]       = useState('')
-  const [showPwd, setShowPwd]       = useState(false)
+  const [password, setPassword]       = useState('')
+  const [confirm, setConfirm]         = useState('')
+  const [showPwd, setShowPwd]         = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
   const mismatch = confirm.length > 0 && password !== confirm
+
+  // Écran de confirmation après inscription réussie
+  if (state.success) {
+    return (
+      <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+        <div className="flex justify-center mb-5">
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center">
+            <MailCheck className="w-8 h-8 text-blue-600" />
+          </div>
+        </div>
+
+        <h2 className="text-xl font-semibold text-gray-900 mb-3">
+          Vérifiez votre boîte mail
+        </h2>
+        <p className="text-sm text-gray-500 mb-2">
+          Un lien de confirmation a été envoyé à votre adresse email.
+        </p>
+        <p className="text-sm text-gray-500 mb-6">
+          Cliquez sur le lien dans l'email pour activer votre compte et accéder au tableau de bord.
+        </p>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 text-left">
+          <p className="text-xs text-amber-700 font-medium mb-1">Vous ne trouvez pas l'email ?</p>
+          <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
+            <li>Vérifiez votre dossier Spam ou Courrier indésirable</li>
+            <li>Le délai d'envoi peut prendre quelques minutes</li>
+          </ul>
+        </div>
+
+        <Link
+          href="/login"
+          className="block w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+        >
+          Aller à la connexion
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8">
