@@ -5,7 +5,7 @@ import { enregistrerTransaction } from '@/lib/actions/transactions'
 import { createClient } from '@/lib/supabase/client'
 import { addPendingTx } from '@/lib/offline/db'
 import { useOffline } from '@/hooks/use-offline'
-import { ArrowDownCircle, ArrowUpCircle, Plus, X, WifiOff } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Plus, X, WifiOff, CloudOff, CheckCircle2 } from 'lucide-react'
 
 interface Reseau { id: string; nom: string; couleur: string }
 interface Point  { id: string; nom: string }
@@ -23,12 +23,13 @@ interface Props {
 export default function NouvelleTransactionForm({
   points, reseaux, peut_deposer, peut_retirer, point_de_vente_fixe, agent_id_fixe,
 }: Props) {
-  const [open,           setOpen]          = useState(false)
-  const [state, action, pending]           = useActionState(enregistrerTransaction, {})
-  const [selectedPoint,  setSelectedPoint] = useState(point_de_vente_fixe ?? '')
-  const [selectedReseau, setSelectedReseau] = useState('')
-  const [agents,         setAgents]        = useState<Agent[]>([])
-  const [offlineQueued,  setOfflineQueued] = useState(false)
+  const [open,            setOpen]           = useState(false)
+  const [state, action, pending]            = useActionState(enregistrerTransaction, {})
+  const [selectedPoint,   setSelectedPoint]  = useState(point_de_vente_fixe ?? '')
+  const [selectedReseau,  setSelectedReseau] = useState('')
+  const [agents,          setAgents]         = useState<Agent[]>([])
+  const [offlineQueued,   setOfflineQueued]  = useState(false)
+  const [offlineError,    setOfflineError]   = useState(false)
   const { isOnline, refreshCount } = useOffline()
 
   const defaultType = peut_deposer ? 'DEPOT' : 'RETRAIT'
@@ -60,20 +61,19 @@ export default function NouvelleTransactionForm({
     if (!navigator.onLine) {
       try {
         await addPendingTx({
-          localId:               crypto.randomUUID(),
-          point_de_vente_id:     fd.get('point_de_vente_id') as string,
-          reseau_id:             fd.get('reseau_id') as string,
-          type:                  fd.get('type') as 'DEPOT' | 'RETRAIT',
-          montant:               Number(fd.get('montant')),
-          note:                  (fd.get('note') as string) || null,
-          agent_id:              (fd.get('agent_id') as string) || null,
-          created_at:            new Date().toISOString(),
+          localId:           crypto.randomUUID(),
+          point_de_vente_id: fd.get('point_de_vente_id') as string,
+          reseau_id:         fd.get('reseau_id') as string,
+          type:              fd.get('type') as 'DEPOT' | 'RETRAIT',
+          montant:           Number(fd.get('montant')),
+          note:              (fd.get('note') as string) || null,
+          agent_id:          (fd.get('agent_id') as string) || null,
+          created_at:        new Date().toISOString(),
         })
-        setOfflineQueued(true)
         await refreshCount()
-        setTimeout(() => { setOfflineQueued(false); setOpen(false) }, 1800)
+        setOfflineQueued(true)
       } catch {
-        /* IndexedDB indisponible */
+        setOfflineError(true)
       }
       return
     }
@@ -94,6 +94,49 @@ export default function NouvelleTransactionForm({
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+
+            {/* ── Écran de confirmation hors ligne ── */}
+            {offlineQueued ? (
+              <div className="flex flex-col items-center text-center py-4">
+                <div className="relative mb-5">
+                  <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center">
+                    <CloudOff className="w-9 h-9 text-amber-500" />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-green-500 rounded-full flex items-center justify-center border-2 border-white">
+                    <CheckCircle2 className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Transaction sauvegardée</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Elle a été enregistrée localement sur cet appareil.
+                </p>
+
+                <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left space-y-2">
+                  <div className="flex items-start gap-2">
+                    <WifiOff className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                    <p className="text-sm text-amber-800 font-medium">Mode hors ligne actif</p>
+                  </div>
+                  <p className="text-xs text-amber-700 pl-6">
+                    La transaction sera automatiquement envoyée au serveur dès que la connexion internet sera rétablie.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => { setOfflineQueued(false); setOpen(false) }}
+                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold transition-colors"
+                >
+                  Compris, fermer
+                </button>
+                <button
+                  onClick={() => setOfflineQueued(false)}
+                  className="mt-2 w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Enregistrer une autre transaction
+                </button>
+              </div>
+            ) : (
+            <>
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold">Nouvelle transaction</h2>
@@ -119,9 +162,9 @@ export default function NouvelleTransactionForm({
                 Transaction enregistrée !
               </div>
             )}
-            {offlineQueued && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-                Sauvegardée hors ligne · sera envoyée automatiquement à la reconnexion
+            {offlineError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                Impossible de sauvegarder hors ligne (stockage indisponible).
               </div>
             )}
 
@@ -304,6 +347,8 @@ export default function NouvelleTransactionForm({
                 </p>
               )}
             </form>
+            </>
+            )}
           </div>
         </div>
       )}
