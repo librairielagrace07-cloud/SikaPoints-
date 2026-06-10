@@ -3,11 +3,12 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { login } from '@/lib/actions/auth'
-import { Mail, Phone } from 'lucide-react'
+import { Mail, Phone, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(login, {})
   const [mode, setMode] = useState<'email' | 'phone'>('email')
+  const [showPwd, setShowPwd] = useState(false)
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -82,15 +83,25 @@ export default function LoginPage() {
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
             Mot de passe
           </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="••••••••"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={showPwd ? 'text' : 'password'}
+              required
+              autoComplete="current-password"
+              className="w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="••••••••"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPwd(v => !v)}
+              tabIndex={-1}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
         <button
