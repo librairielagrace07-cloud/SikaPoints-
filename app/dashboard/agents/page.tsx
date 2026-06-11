@@ -35,6 +35,7 @@ export default async function AgentsPage() {
     peut_retirer: boolean
     peut_voir_rapports: boolean
     peut_modifier_uv: boolean
+    peut_recharger_uv: boolean
     points_de_vente: { nom: string } | null
   }>
 
