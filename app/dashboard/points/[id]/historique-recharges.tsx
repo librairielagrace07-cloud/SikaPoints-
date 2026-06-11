@@ -12,8 +12,6 @@ interface RechargeUV {
 }
 
 export default function HistoriqueRecharges({ recharges }: { recharges: RechargeUV[] }) {
-  if (recharges.length === 0) return null
-
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
@@ -22,6 +20,11 @@ export default function HistoriqueRecharges({ recharges }: { recharges: Recharge
         <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{recharges.length}</span>
       </div>
 
+      {recharges.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-400 text-sm">
+          Aucune recharge enregistrée pour ce point
+        </div>
+      ) : (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
         {recharges.map(r => {
           const reseau = r.uv?.reseaux
@@ -62,6 +65,7 @@ export default function HistoriqueRecharges({ recharges }: { recharges: Recharge
           )
         })}
       </div>
+      )}
     </div>
   )
 }
