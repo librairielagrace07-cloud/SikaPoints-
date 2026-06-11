@@ -158,14 +158,25 @@ export async function mettreAJourUV(prevState: ActionState, formData: FormData):
   const seuilResult = montantSchema.or(z.literal(0)).safeParse(formData.get('seuil_alerte'))
   if (!seuilResult.success) return { error: 'Seuil invalide' }
 
-  // Vérifier que le point appartient à l'utilisateur connecté
-  const { data: point } = await supabase
+  // Vérifier accès : propriétaire OU agent avec peut_modifier_uv = true
+  const { data: pointOwner } = await supabase
     .from('points_de_vente')
     .select('id')
     .eq('id', pointIdResult.data)
     .eq('proprietaire_id', user.id)
     .single()
-  if (!point) return { error: 'Accès non autorisé' }
+
+  if (!pointOwner) {
+    const { data: agentUv } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('point_de_vente_id', pointIdResult.data)
+      .eq('peut_modifier_uv', true)
+      .eq('actif', true)
+      .single()
+    if (!agentUv) return { error: 'Accès non autorisé' }
+  }
 
   const { data: current } = await supabase
     .from('uv')
@@ -186,6 +197,67 @@ export async function mettreAJourUV(prevState: ActionState, formData: FormData):
       montant_max: nouveauMax,
       seuil_alerte: seuilResult.data,
       updated_at: new Date().toISOString(),
+    })
+    .eq('id', uvIdResult.data)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/dashboard/points/${pointIdResult.data}`)
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+export async function rechargerUV(prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Non authentifié' }
+
+  const uvIdResult    = uuidSchema.safeParse(formData.get('uv_id'))
+  const pointIdResult = uuidSchema.safeParse(formData.get('point_de_vente_id'))
+  if (!uvIdResult.success || !pointIdResult.success) return { error: 'Identifiants invalides' }
+
+  const montantResult = montantSchema.safeParse(formData.get('montant_recharge'))
+  if (!montantResult.success) return { error: 'Montant invalide (doit être un entier positif)' }
+
+  // Accès : propriétaire OU agent avec peut_recharger_uv = true
+  const { data: pointOwner } = await supabase
+    .from('points_de_vente')
+    .select('id')
+    .eq('id', pointIdResult.data)
+    .eq('proprietaire_id', user.id)
+    .single()
+
+  if (!pointOwner) {
+    const { data: agentRecharge } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('point_de_vente_id', pointIdResult.data)
+      .eq('peut_recharger_uv', true)
+      .eq('actif', true)
+      .single()
+    if (!agentRecharge) return { error: 'Accès non autorisé' }
+  }
+
+  const { data: current } = await supabase
+    .from('uv')
+    .select('montant, montant_max')
+    .eq('id', uvIdResult.data)
+    .eq('point_de_vente_id', pointIdResult.data)
+    .single()
+
+  if (!current) return { error: 'UV introuvable' }
+
+  const c = current as { montant: number; montant_max: number }
+  const nouveauMontant = c.montant + montantResult.data
+  const nouveauMax = Math.max(c.montant_max ?? 0, nouveauMontant)
+
+  const { error } = await supabase
+    .from('uv')
+    .update({
+      montant:     nouveauMontant,
+      montant_max: nouveauMax,
+      updated_at:  new Date().toISOString(),
     })
     .eq('id', uvIdResult.data)
 

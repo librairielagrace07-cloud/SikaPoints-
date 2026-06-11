@@ -23,6 +23,7 @@ export default async function DashboardPage() {
         pointId={permissions.point_de_vente_id!}
         depuis={today.toISOString()}
         peutModifierUV={permissions.peut_modifier_uv}
+      peutRechargerUV={permissions.peut_recharger_uv}
       />
     )
   }
@@ -33,8 +34,8 @@ export default async function DashboardPage() {
 // ─── Vue Agent ────────────────────────────────────────────────────────────────
 
 async function DashboardAgent({
-  userId, pointId, depuis, peutModifierUV,
-}: { userId: string; pointId: string; depuis: string; peutModifierUV: boolean }) {
+  userId, pointId, depuis, peutModifierUV, peutRechargerUV,
+}: { userId: string; pointId: string; depuis: string; peutModifierUV: boolean; peutRechargerUV: boolean }) {
   const supabase = await createClient()
 
   const [{ data: point }, { data: uvData }, { data: transactions }, { data: allTx }, { data: depEspeces }] = await Promise.all([
@@ -146,12 +147,14 @@ async function DashboardAgent({
         <h2 className="text-lg font-semibold text-gray-900 mb-3">UV disponible</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {uv.map((u, i) => {
-            if (peutModifierUV) {
+            if (peutModifierUV || peutRechargerUV) {
               return (
                 <UVCard
                   key={u.id ?? i}
                   uv={{ id: u.id, montant: u.montant, montant_max: u.montant_max, seuil_alerte: u.seuil_alerte, point_de_vente_id: u.point_de_vente_id, reseaux: u.reseaux }}
                   pointId={pointId}
+                  peutModifier={peutModifierUV}
+                  peutRecharger={peutRechargerUV}
                 />
               )
             }

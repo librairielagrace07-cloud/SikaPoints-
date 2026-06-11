@@ -7,6 +7,7 @@ export interface UserPermissions {
   peut_retirer: boolean
   peut_voir_rapports: boolean
   peut_modifier_uv: boolean
+  peut_recharger_uv: boolean
   point_de_vente_id: string | null
 }
 
@@ -17,6 +18,7 @@ const AGENT_NO_ACCESS: UserPermissions = {
   peut_retirer: false,
   peut_voir_rapports: false,
   peut_modifier_uv: false,
+  peut_recharger_uv: false,
   point_de_vente_id: null,
 }
 
@@ -47,14 +49,14 @@ export async function getUserPermissions(userId?: string): Promise<UserPermissio
       peut_retirer: true,
       peut_voir_rapports: true,
       peut_modifier_uv: true,
+      peut_recharger_uv: true,
       point_de_vente_id: null,
     }
   }
 
-  // C'est un agent — récupérer ses permissions
   const { data: agent } = await supabase
     .from('agents')
-    .select('point_de_vente_id, peut_deposer, peut_retirer, peut_voir_rapports, peut_modifier_uv, actif')
+    .select('point_de_vente_id, peut_deposer, peut_retirer, peut_voir_rapports, peut_modifier_uv, peut_recharger_uv, actif')
     .eq('user_id', uid)
     .eq('actif', true)
     .single()
@@ -67,6 +69,7 @@ export async function getUserPermissions(userId?: string): Promise<UserPermissio
     peut_retirer: boolean
     peut_voir_rapports: boolean
     peut_modifier_uv: boolean
+    peut_recharger_uv: boolean
   }
 
   return {
@@ -76,6 +79,7 @@ export async function getUserPermissions(userId?: string): Promise<UserPermissio
     peut_retirer: a.peut_retirer,
     peut_voir_rapports: a.peut_voir_rapports,
     peut_modifier_uv: a.peut_modifier_uv,
+    peut_recharger_uv: a.peut_recharger_uv,
     point_de_vente_id: a.point_de_vente_id,
   }
 }

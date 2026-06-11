@@ -18,6 +18,7 @@ const PERMISSIONS = [
   { key: 'peut_retirer', label: 'Faire des retraits', defaultOn: true },
   { key: 'peut_voir_rapports', label: 'Voir les rapports', defaultOn: false },
   { key: 'peut_modifier_uv', label: 'Modifier l\'UV manuellement', defaultOn: false },
+  { key: 'peut_recharger_uv', label: 'Recharger l\'UV', defaultOn: false },
 ]
 
 export default function NouvelAgentForm({ points, atLimit, maxAgents }: Props) {

@@ -13,6 +13,7 @@ interface Agent {
   peut_retirer: boolean
   peut_voir_rapports: boolean
   peut_modifier_uv: boolean
+  peut_recharger_uv: boolean
   points_de_vente: { nom: string } | null
 }
 
@@ -21,6 +22,7 @@ const PERMISSIONS = [
   { key: 'peut_retirer', label: 'Retraits' },
   { key: 'peut_voir_rapports', label: 'Rapports' },
   { key: 'peut_modifier_uv', label: 'Modifier UV' },
+  { key: 'peut_recharger_uv', label: 'Recharger UV' },
 ] as const
 
 export default function AgentCard({ agent }: { agent: Agent }) {

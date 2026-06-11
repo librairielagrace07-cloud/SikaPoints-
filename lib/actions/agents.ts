@@ -14,6 +14,7 @@ export type Permissions = {
   peut_retirer: boolean
   peut_voir_rapports: boolean
   peut_modifier_uv: boolean
+  peut_recharger_uv: boolean
 }
 
 const AgentCompteSchema = z.object({
@@ -25,6 +26,7 @@ const AgentCompteSchema = z.object({
   peut_retirer:      z.boolean().default(true),
   peut_voir_rapports: z.boolean().default(false),
   peut_modifier_uv:  z.boolean().default(false),
+  peut_recharger_uv: z.boolean().default(false),
 })
 
 /** Vérifie que l'agent appartient (via son point) à l'utilisateur connecté. */
@@ -66,6 +68,7 @@ export async function creerCompteAgent(prevState: ActionState, formData: FormDat
     peut_retirer:       formData.get('peut_retirer') === 'on',
     peut_voir_rapports: formData.get('peut_voir_rapports') === 'on',
     peut_modifier_uv:   formData.get('peut_modifier_uv') === 'on',
+    peut_recharger_uv:  formData.get('peut_recharger_uv') === 'on',
   }
 
   const parsed = AgentCompteSchema.safeParse(raw)
@@ -137,6 +140,7 @@ export async function creerCompteAgent(prevState: ActionState, formData: FormDat
     peut_retirer:      parsed.data.peut_retirer,
     peut_voir_rapports: parsed.data.peut_voir_rapports,
     peut_modifier_uv:  parsed.data.peut_modifier_uv,
+    peut_recharger_uv: parsed.data.peut_recharger_uv,
   })
 
   if (agentError) {
@@ -212,6 +216,7 @@ export async function modifierPermissions(prevState: ActionState, formData: Form
     peut_retirer:       formData.get('peut_retirer')       === 'on',
     peut_voir_rapports: formData.get('peut_voir_rapports') === 'on',
     peut_modifier_uv:   formData.get('peut_modifier_uv')   === 'on',
+    peut_recharger_uv:  formData.get('peut_recharger_uv')  === 'on',
     actif:              formData.get('actif')               === 'on',
   }).eq('id', agentIdResult.data)
 

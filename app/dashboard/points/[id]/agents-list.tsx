@@ -17,6 +17,7 @@ const PERMISSIONS = [
   { key: 'peut_retirer', label: 'Retraits', defaultOn: true },
   { key: 'peut_voir_rapports', label: 'Rapports', defaultOn: false },
   { key: 'peut_modifier_uv', label: 'Modifier UV', defaultOn: false },
+  { key: 'peut_recharger_uv', label: 'Recharger UV', defaultOn: false },
 ]
 
 export default function AgentsList({ agents, pointId }: { agents: Agent[]; pointId: string }) {

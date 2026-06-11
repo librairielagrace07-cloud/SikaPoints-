@@ -127,7 +127,13 @@ export default async function PointDetailPage({ params }: { params: Promise<{ id
         <h2 className="text-lg font-semibold text-gray-900 mb-3">UV disponible</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {uvData?.map(uv => (
-            <UVCard key={uv.id} uv={uv} pointId={id} />
+            <UVCard
+              key={uv.id}
+              uv={uv}
+              pointId={id}
+              peutModifier={estProprietaire || permissions.peut_modifier_uv}
+              peutRecharger={estProprietaire || permissions.peut_recharger_uv}
+            />
           ))}
         </div>
       </div>
