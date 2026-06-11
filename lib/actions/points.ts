@@ -263,6 +263,23 @@ export async function rechargerUV(prevState: ActionState, formData: FormData): P
 
   if (error) return { error: error.message }
 
+  // Traçabilité : enregistrer la recharge dans l'historique
+  const { data: profil } = await supabase
+    .from('profils')
+    .select('nom_complet')
+    .eq('id', user.id)
+    .single()
+
+  await supabase.from('recharges_uv').insert({
+    uv_id:             uvIdResult.data,
+    point_de_vente_id: pointIdResult.data,
+    user_id:           user.id,
+    nom_utilisateur:   (profil as { nom_complet: string } | null)?.nom_complet ?? user.email ?? 'Inconnu',
+    montant_recharge:  montantResult.data,
+    montant_avant:     c.montant,
+    montant_apres:     nouveauMontant,
+  })
+
   revalidatePath(`/dashboard/points/${pointIdResult.data}`)
   revalidatePath('/dashboard')
   return { success: true }

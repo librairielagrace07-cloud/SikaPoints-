@@ -7,6 +7,7 @@ import UVCard from './uv-card'
 import AgentsList from './agents-list'
 import TransactionsList from './transactions-list'
 import CaisseCard from './caisse-card'
+import HistoriqueRecharges from './historique-recharges'
 
 export default async function PointDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -32,6 +33,7 @@ export default async function PointDetailPage({ params }: { params: Promise<{ id
     { data: reseaux },
     { data: allTx },
     { data: depEspeces },
+    { data: rechargesUV },
   ] = await Promise.all([
     supabase
       .from('uv')
@@ -60,6 +62,13 @@ export default async function PointDetailPage({ params }: { params: Promise<{ id
       .select('montant')
       .eq('point_de_vente_id', id)
       .eq('mode_paiement', 'ESPECES'),
+    // Historique des recharges UV
+    supabase
+      .from('recharges_uv')
+      .select('id, montant_recharge, montant_avant, montant_apres, nom_utilisateur, created_at, uv(reseaux(nom, couleur))')
+      .eq('point_de_vente_id', id)
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
 
   // ── Calcul caisse physique ─────────────────────────────────────────────────
@@ -151,6 +160,9 @@ export default async function PointDetailPage({ params }: { params: Promise<{ id
           ))}
         </div>
       </div>
+
+      {/* Historique des recharges UV */}
+      <HistoriqueRecharges recharges={(rechargesUV ?? []) as unknown as Parameters<typeof HistoriqueRecharges>[0]['recharges']} />
 
       {/* Agents */}
       <AgentsList agents={agents ?? []} pointId={id} />
