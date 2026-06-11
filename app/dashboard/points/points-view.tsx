@@ -97,15 +97,15 @@ export default function PointsView({ stats }: { stats: PointStat[] }) {
                 </div>
               )}
 
-              {/* Mini stats */}
+              {/* Stats journalières */}
               <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
                 <div className="bg-green-50 rounded-lg px-2.5 py-1.5">
-                  <p className="text-green-600 font-medium">Dépôts</p>
-                  <p className="font-bold text-green-800 tabular-nums">{formatMontant(s.totalDepots)}</p>
+                  <p className="text-green-600 font-medium">Dépôts aujourd'hui</p>
+                  <p className="font-bold text-green-800 tabular-nums">{formatMontant(s.depotsJour)}</p>
                 </div>
                 <div className="bg-orange-50 rounded-lg px-2.5 py-1.5">
-                  <p className="text-orange-600 font-medium">Retraits</p>
-                  <p className="font-bold text-orange-800 tabular-nums">{formatMontant(s.totalRetraits)}</p>
+                  <p className="text-orange-600 font-medium">Retraits aujourd'hui</p>
+                  <p className="font-bold text-orange-800 tabular-nums">{formatMontant(s.retraitsJour)}</p>
                 </div>
               </div>
 

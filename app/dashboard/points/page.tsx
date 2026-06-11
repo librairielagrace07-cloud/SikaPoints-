@@ -10,6 +10,8 @@ export interface PointStat {
   telephone: string | null
   caisseInitiale: number
   agentsCount: number
+  depotsJour: number
+  retraitsJour: number
   totalDepots: number
   totalRetraits: number
   soldeCaisse: number
@@ -36,11 +38,14 @@ export default async function PointsPage() {
 
   const pointIds = (points ?? []).map(p => p.id)
 
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
   // Transactions all-time (pour caisse + volumes)
   const [{ data: allTx }, { data: depEspeces }] = await Promise.all([
     supabase
       .from('transactions')
-      .select('type, montant, point_de_vente_id')
+      .select('type, montant, point_de_vente_id, created_at')
       .in('point_de_vente_id', pointIds.length > 0 ? pointIds : ['none']),
     supabase
       .from('depenses')
@@ -49,18 +54,21 @@ export default async function PointsPage() {
       .eq('mode_paiement', 'ESPECES'),
   ])
 
-  type TxRow  = { type: string; montant: number; point_de_vente_id: string }
+  type TxRow  = { type: string; montant: number; point_de_vente_id: string; created_at: string }
   type DepRow = { montant: number; point_de_vente_id: string }
   const txRows  = (allTx  ?? []) as TxRow[]
   const depRows = (depEspeces ?? []) as DepRow[]
 
   // Calcul des stats par point
   const stats: PointStat[] = (points ?? []).map(p => {
-    const ptx  = txRows.filter(t => t.point_de_vente_id === p.id)
-    const pdep = depRows.filter(d => d.point_de_vente_id === p.id)
+    const ptx      = txRows.filter(t => t.point_de_vente_id === p.id)
+    const ptxJour  = ptx.filter(t => new Date(t.created_at) >= today)
+    const pdep     = depRows.filter(d => d.point_de_vente_id === p.id)
 
-    const totalDepots   = ptx.filter(t => t.type === 'DEPOT').reduce((s, t)  => s + t.montant, 0)
-    const totalRetraits = ptx.filter(t => t.type === 'RETRAIT').reduce((s, t) => s + t.montant, 0)
+    const depotsJour    = ptxJour.filter(t => t.type === 'DEPOT').reduce((s, t)   => s + t.montant, 0)
+    const retraitsJour  = ptxJour.filter(t => t.type === 'RETRAIT').reduce((s, t) => s + t.montant, 0)
+    const totalDepots   = ptx.filter(t => t.type === 'DEPOT').reduce((s, t)       => s + t.montant, 0)
+    const totalRetraits = ptx.filter(t => t.type === 'RETRAIT').reduce((s, t)     => s + t.montant, 0)
     const depEspMnt     = pdep.reduce((s, d) => s + d.montant, 0)
     const caisseInit    = (p.caisse_initiale as number | null) ?? 0
     const soldeCaisse   = caisseInit + totalDepots - totalRetraits - depEspMnt
@@ -83,6 +91,8 @@ export default async function PointsPage() {
       telephone: p.telephone ?? null,
       caisseInitiale: caisseInit,
       agentsCount,
+      depotsJour,
+      retraitsJour,
       totalDepots,
       totalRetraits,
       soldeCaisse,
