@@ -73,9 +73,9 @@ export default async function PointDetailPage({ params }: { params: Promise<{ id
   const variationJour = todayTx.filter(t => t.type === 'DEPOT').reduce((s, t) => s + t.montant, 0)
                       - todayTx.filter(t => t.type === 'RETRAIT').reduce((s, t) => s + t.montant, 0)
 
-  // ── Résumé récent (pour les cartes du haut) ───────────────────────────────
-  const totalDepots   = transactions?.filter(t => t.type === 'DEPOT').reduce((s, t) => s + t.montant, 0) ?? 0
-  const totalRetraits = transactions?.filter(t => t.type === 'RETRAIT').reduce((s, t) => s + t.montant, 0) ?? 0
+  // ── Stats journalières ────────────────────────────────────────────────────
+  const depotsJour   = todayTx.filter(t => t.type === 'DEPOT').reduce((s, t) => s + t.montant, 0)
+  const retraitsJour = todayTx.filter(t => t.type === 'RETRAIT').reduce((s, t) => s + t.montant, 0)
 
   const caisseInitiale = (point.caisse_initiale as number | null) ?? 0
   const estProprietaire = permissions.role === 'PROPRIETAIRE'
@@ -93,21 +93,35 @@ export default async function PointDetailPage({ params }: { params: Promise<{ id
         {point.telephone && <p className="text-gray-500 text-sm">{point.telephone}</p>}
       </div>
 
-      {/* Résumé transactions récentes */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-green-50 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <ArrowDownCircle className="w-4 h-4 text-green-600" />
-            <span className="text-xs text-green-700 font-medium">Total dépôts (50 dern.)</span>
+      {/* ── Stats journalières ──────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Ligne 1 : aujourd'hui */}
+        <div className="grid grid-cols-2 divide-x divide-gray-100">
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 mb-1">
+              <ArrowDownCircle className="w-3.5 h-3.5 text-green-500" />
+              <span className="text-xs text-gray-500 font-medium">Dépôts aujourd'hui</span>
+            </div>
+            <p className="text-xl font-bold text-green-600">{formatMontant(depotsJour)}</p>
           </div>
-          <p className="text-xl font-bold text-green-800">{formatMontant(totalDepots)}</p>
+          <div className="p-4">
+            <div className="flex items-center gap-1.5 mb-1">
+              <ArrowUpCircle className="w-3.5 h-3.5 text-orange-500" />
+              <span className="text-xs text-gray-500 font-medium">Retraits aujourd'hui</span>
+            </div>
+            <p className="text-xl font-bold text-orange-500">{formatMontant(retraitsJour)}</p>
+          </div>
         </div>
-        <div className="bg-orange-50 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <ArrowUpCircle className="w-4 h-4 text-orange-600" />
-            <span className="text-xs text-orange-700 font-medium">Total retraits (50 dern.)</span>
+        {/* Ligne 2 : totaux globaux */}
+        <div className="grid grid-cols-2 divide-x divide-gray-100 border-t border-gray-100 bg-gray-50">
+          <div className="px-4 py-3">
+            <p className="text-xs text-gray-400 mb-0.5">Total dépôts</p>
+            <p className="text-base font-semibold text-green-700">{formatMontant(totalCashIn)}</p>
           </div>
-          <p className="text-xl font-bold text-orange-800">{formatMontant(totalRetraits)}</p>
+          <div className="px-4 py-3">
+            <p className="text-xs text-gray-400 mb-0.5">Total retraits</p>
+            <p className="text-base font-semibold text-orange-600">{formatMontant(totalCashOut)}</p>
+          </div>
         </div>
       </div>
 
