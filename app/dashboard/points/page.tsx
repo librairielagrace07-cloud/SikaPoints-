@@ -161,6 +161,13 @@ export default async function PointsPage() {
         <NouveauPointForm atLimit={atLimit} maxPoints={limits.maxPoints} />
       </div>
 
+      {/* DEBUG TEMPORAIRE — à supprimer */}
+      <pre className="bg-gray-100 text-xs p-3 rounded overflow-auto max-h-40">
+        sessions({sessionRows.length}): {JSON.stringify(sessionRows.map(s => ({ pdv: s.point_de_vente_id.slice(0,8), ferme: s.ferme_a })))}
+        {'\n'}pointIds: {JSON.stringify(pointIds.map(id => id.slice(0,8)))}
+        {'\n'}stats statuts: {JSON.stringify(stats.map(s => ({ nom: s.nom, statut: s.statut })))}
+      </pre>
+
       <RealtimeSessions pointIds={pointIds} />
       <PointsView stats={stats} />
     </div>
