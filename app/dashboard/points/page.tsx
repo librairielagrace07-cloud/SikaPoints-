@@ -74,9 +74,6 @@ export default async function PointsPage() {
   const depRows     = (depEspeces  ?? []) as DepRow[]
   const sessionRows = (sessionsData ?? []) as SessionRow[]
 
-  console.log('[points] pointIds:', pointIds)
-  console.log('[points] sessionsData count:', sessionRows.length, 'rows:', JSON.stringify(sessionRows))
-
   // Calcul des stats par point
   const stats: PointStat[] = (points ?? []).map(p => {
     const ptx      = txRows.filter(t => t.point_de_vente_id === p.id)
@@ -160,13 +157,6 @@ export default async function PointsPage() {
         </div>
         <NouveauPointForm atLimit={atLimit} maxPoints={limits.maxPoints} />
       </div>
-
-      {/* DEBUG TEMPORAIRE — à supprimer */}
-      <pre className="bg-gray-100 text-xs p-3 rounded overflow-auto max-h-40">
-        sessions({sessionRows.length}): {JSON.stringify(sessionRows.map(s => ({ pdv: s.point_de_vente_id.slice(0,8), ferme: s.ferme_a })))}
-        {'\n'}pointIds: {JSON.stringify(pointIds.map(id => id.slice(0,8)))}
-        {'\n'}stats statuts: {JSON.stringify(stats.map(s => ({ nom: s.nom, statut: s.statut })))}
-      </pre>
 
       <RealtimeSessions pointIds={pointIds} />
       <PointsView stats={stats} />
