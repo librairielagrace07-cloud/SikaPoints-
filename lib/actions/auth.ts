@@ -54,11 +54,37 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
 
     if (!matchedUser) return { error: 'Numéro de téléphone non trouvé' }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({
       email:    matchedUser.email!,
       password: parsed.data.password,
     })
     if (error) return { error: 'Numéro ou mot de passe incorrect' }
+
+    // Enregistrer l'ouverture de session de l'agent via adminClient (bypass RLS)
+    const userId = signInData.user?.id
+    if (userId) {
+      const { data: agent } = await adminClient
+        .from('agents')
+        .select('id, nom_complet, point_de_vente_id')
+        .eq('user_id', userId)
+        .eq('actif', true)
+        .single()
+      if (agent) {
+        const a = agent as { id: string; nom_complet: string; point_de_vente_id: string }
+        await adminClient
+          .from('sessions_agents')
+          .update({ ferme_a: new Date().toISOString() })
+          .eq('user_id', userId)
+          .is('ferme_a', null)
+        await adminClient.from('sessions_agents').insert({
+          agent_id:          a.id,
+          point_de_vente_id: a.point_de_vente_id,
+          user_id:           userId,
+          nom_agent:         a.nom_complet,
+          ouvert_a:          new Date().toISOString(),
+        })
+      }
+    }
 
   } else {
     const raw = {
@@ -109,6 +135,18 @@ export async function register(prevState: AuthState, formData: FormData): Promis
 
 export async function logout() {
   const supabase = await createClient()
+  const admin    = createAdminClient()
+
+  // Clôturer la session ouverte de l'agent via adminClient (bypass RLS)
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await admin
+      .from('sessions_agents')
+      .update({ ferme_a: new Date().toISOString() })
+      .eq('user_id', user.id)
+      .is('ferme_a', null)
+  }
+
   await supabase.auth.signOut()
   redirect('/login')
 }
