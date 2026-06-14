@@ -74,6 +74,9 @@ export default async function PointsPage() {
   const depRows     = (depEspeces  ?? []) as DepRow[]
   const sessionRows = (sessionsData ?? []) as SessionRow[]
 
+  console.log('[points] pointIds:', pointIds)
+  console.log('[points] sessionsData count:', sessionRows.length, 'rows:', JSON.stringify(sessionRows))
+
   // Calcul des stats par point
   const stats: PointStat[] = (points ?? []).map(p => {
     const ptx      = txRows.filter(t => t.point_de_vente_id === p.id)
