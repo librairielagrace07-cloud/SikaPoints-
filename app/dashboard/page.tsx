@@ -267,12 +267,12 @@ async function DashboardProprietaire({ userId, depuis }: { userId: string; depui
       .select('montant, point_de_vente_id')
       .in('point_de_vente_id', pointIds.length > 0 ? pointIds : ['none'])
       .eq('mode_paiement', 'ESPECES'),
-    // Sessions agents du jour (adminClient pour bypass RLS)
+    // Sessions agents récentes — 48h pour capturer sessions ouvertes hier encore actives
     adminClient
       .from('sessions_agents')
       .select('point_de_vente_id, ouvert_a, ferme_a, nom_agent')
       .in('point_de_vente_id', pointIds.length > 0 ? pointIds : ['none'])
-      .gte('ouvert_a', todayStart.toISOString())
+      .gte('ouvert_a', new Date(Date.now() - 48 * 3600 * 1000).toISOString())
       .order('ouvert_a', { ascending: false }),
   ])
 
