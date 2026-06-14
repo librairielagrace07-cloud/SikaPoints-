@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import UVCard from './points/[id]/uv-card'
+import RealtimeSessions from '@/components/realtime-sessions'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -234,11 +235,15 @@ async function DashboardProprietaire({ userId, depuis }: { userId: string; depui
 
   const pointIds = (points as Array<{ id: string; nom: string; caisse_initiale: number | null }> | null)?.map(p => p.id) ?? []
 
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+
   const [
     { data: uvData },
     { data: transactionsJour },
     { data: allTx },
     { data: depEspeces },
+    { data: sessionsData },
   ] = await Promise.all([
     supabase
       .from('uv')
@@ -260,6 +265,13 @@ async function DashboardProprietaire({ userId, depuis }: { userId: string; depui
       .select('montant, point_de_vente_id')
       .in('point_de_vente_id', pointIds.length > 0 ? pointIds : ['none'])
       .eq('mode_paiement', 'ESPECES'),
+    // Sessions agents du jour
+    supabase
+      .from('sessions_agents')
+      .select('point_de_vente_id, ouvert_a, ferme_a, nom_agent')
+      .in('point_de_vente_id', pointIds.length > 0 ? pointIds : ['none'])
+      .gte('ouvert_a', todayStart.toISOString())
+      .order('ouvert_a', { ascending: false }),
   ])
 
   const totalDepots   = (transactionsJour ?? []).filter((t: { type: string }) => t.type === 'DEPOT').reduce((s: number, t: { montant: number }) => s + t.montant, 0)
@@ -267,13 +279,15 @@ async function DashboardProprietaire({ userId, depuis }: { userId: string; depui
   const uvFaibles     = (uvData ?? []).filter((u: { montant: number; seuil_alerte: number }) => u.montant <= u.seuil_alerte)
 
   // ── Calcul solde de caisse global ─────────────────────────────────────────
-  type TxRow  = { type: string; montant: number; point_de_vente_id: string }
-  type DepRow = { montant: number; point_de_vente_id: string }
-  type PdvRow = { id: string; nom: string; caisse_initiale: number | null }
+  type TxRow      = { type: string; montant: number; point_de_vente_id: string }
+  type DepRow     = { montant: number; point_de_vente_id: string }
+  type PdvRow     = { id: string; nom: string; caisse_initiale: number | null }
+  type SessionRow = { point_de_vente_id: string; ouvert_a: string; ferme_a: string | null; nom_agent: string | null }
 
-  const pdvList   = (points ?? []) as PdvRow[]
-  const txAllRows = (allTx ?? []) as TxRow[]
-  const depRows   = (depEspeces ?? []) as DepRow[]
+  const pdvList      = (points     ?? []) as PdvRow[]
+  const txAllRows    = (allTx      ?? []) as TxRow[]
+  const depRows      = (depEspeces ?? []) as DepRow[]
+  const sessionRows  = (sessionsData ?? []) as SessionRow[]
 
   // Calcul par point
   const caissesParPoint = pdvList.map(p => {
@@ -283,13 +297,26 @@ async function DashboardProprietaire({ userId, depuis }: { userId: string; depui
     const cashOut = ptx.filter(t => t.type === 'RETRAIT').reduce((s, t) => s + t.montant, 0)
     const dep     = pdep.reduce((s, d) => s + d.montant, 0)
     const solde   = (p.caisse_initiale ?? 0) + cashIn - cashOut - dep
-    return { nom: p.nom, solde, cashIn, cashOut }
+
+    // Statut session
+    const pSessions = sessionRows.filter(s => s.point_de_vente_id === p.id)
+    const sessionOuverte  = pSessions.find(s => s.ferme_a === null)
+    const derniereSession = pSessions.find(s => s.ferme_a !== null)
+    const statut      = sessionOuverte ? 'ouvert' : derniereSession ? 'ferme' : null
+    const statutHeure = sessionOuverte
+      ? new Date(sessionOuverte.ouvert_a).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      : derniereSession
+        ? new Date(derniereSession.ferme_a!).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        : null
+
+    return { nom: p.nom, solde, cashIn, cashOut, statut, statutHeure }
   })
 
   const soldeCaisseGlobal = caissesParPoint.reduce((s, p) => s + p.solde, 0)
 
   return (
     <div className="space-y-6">
+      <RealtimeSessions pointIds={pointIds} />
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
         <p className="text-gray-500 text-sm mt-1">Vue d'ensemble de vos points Mobile Money</p>
@@ -323,13 +350,27 @@ async function DashboardProprietaire({ userId, depuis }: { userId: string; depui
           <div className="divide-y divide-gray-100">
             {caissesParPoint.map((p, i) => (
               <div key={i} className="flex items-center justify-between px-5 py-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
                     <Store className="w-3.5 h-3.5 text-gray-500" />
                   </div>
-                  <span className="text-sm font-medium text-gray-800">{p.nom}</span>
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-gray-800 block truncate">{p.nom}</span>
+                    {p.statut === 'ouvert' && (
+                      <span className="flex items-center gap-1 text-xs text-green-700 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                        Ouvert · {p.statutHeure}
+                      </span>
+                    )}
+                    {p.statut === 'ferme' && (
+                      <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
+                        Fermé · {p.statutHeure}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                   <span className="text-xs text-green-600 hidden sm:block">+{formatMontant(p.cashIn)}</span>
                   <span className="text-xs text-red-500 hidden sm:block">-{formatMontant(p.cashOut)}</span>
                   <span className={`text-sm font-bold tabular-nums ${p.solde < 0 ? 'text-red-600' : 'text-gray-900'}`}>
