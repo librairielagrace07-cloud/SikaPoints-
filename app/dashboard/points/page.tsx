@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import NouveauPointForm from './nouveau-point-form'
 import PointsView from './points-view'
 import { getLimits, getPlanLabel } from '@/lib/plan-limits'
+import RealtimeSessions from '@/components/realtime-sessions'
 
 export interface PointStat {
   id: string
@@ -18,10 +20,14 @@ export interface PointStat {
   uvTotal: number
   uvFaibles: number
   uvList: Array<{ nom: string; couleur: string; montant: number; seuil_alerte: number }>
+  statut: 'ouvert' | 'ferme' | null
+  statutHeure: string | null
+  statutNomAgent: string | null
 }
 
 export default async function PointsPage() {
-  const supabase = await createClient()
+  const supabase      = await createClient()
+  const adminClient   = createAdminClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   // Plan de l'utilisateur
@@ -41,8 +47,8 @@ export default async function PointsPage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  // Transactions all-time (pour caisse + volumes)
-  const [{ data: allTx }, { data: depEspeces }] = await Promise.all([
+  // Transactions all-time (pour caisse + volumes) + sessions agents
+  const [{ data: allTx }, { data: depEspeces }, { data: sessionsData }] = await Promise.all([
     supabase
       .from('transactions')
       .select('type, montant, point_de_vente_id, created_at')
@@ -52,12 +58,21 @@ export default async function PointsPage() {
       .select('montant, point_de_vente_id')
       .in('point_de_vente_id', pointIds.length > 0 ? pointIds : ['none'])
       .eq('mode_paiement', 'ESPECES'),
+    // Sessions agents du jour (adminClient pour bypass RLS)
+    adminClient
+      .from('sessions_agents')
+      .select('point_de_vente_id, ouvert_a, ferme_a, nom_agent')
+      .in('point_de_vente_id', pointIds.length > 0 ? pointIds : ['none'])
+      .gte('ouvert_a', today.toISOString())
+      .order('ouvert_a', { ascending: false }),
   ])
 
-  type TxRow  = { type: string; montant: number; point_de_vente_id: string; created_at: string }
-  type DepRow = { montant: number; point_de_vente_id: string }
-  const txRows  = (allTx  ?? []) as TxRow[]
-  const depRows = (depEspeces ?? []) as DepRow[]
+  type TxRow      = { type: string; montant: number; point_de_vente_id: string; created_at: string }
+  type DepRow     = { montant: number; point_de_vente_id: string }
+  type SessionRow = { point_de_vente_id: string; ouvert_a: string; ferme_a: string | null; nom_agent: string | null }
+  const txRows      = (allTx       ?? []) as TxRow[]
+  const depRows     = (depEspeces  ?? []) as DepRow[]
+  const sessionRows = (sessionsData ?? []) as SessionRow[]
 
   // Calcul des stats par point
   const stats: PointStat[] = (points ?? []).map(p => {
@@ -84,6 +99,25 @@ export default async function PointsPage() {
     const uvFaibles = uvList.filter(u => u.montant <= u.seuil_alerte).length
     const agentsCount = (p.agents as Array<{ count: number }>)?.[0]?.count ?? 0
 
+    // Statut session du point
+    const pSessions = sessionRows.filter(s => s.point_de_vente_id === p.id)
+    const sessionOuverte = pSessions.find(s => s.ferme_a === null)
+    const derniereSession = pSessions.find(s => s.ferme_a !== null)
+
+    let statut: 'ouvert' | 'ferme' | null = null
+    let statutHeure: string | null = null
+    let statutNomAgent: string | null = null
+
+    if (sessionOuverte) {
+      statut = 'ouvert'
+      statutHeure = new Date(sessionOuverte.ouvert_a).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      statutNomAgent = sessionOuverte.nom_agent
+    } else if (derniereSession) {
+      statut = 'ferme'
+      statutHeure = new Date(derniereSession.ferme_a!).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      statutNomAgent = derniereSession.nom_agent
+    }
+
     return {
       id: p.id,
       nom: p.nom,
@@ -99,6 +133,9 @@ export default async function PointsPage() {
       uvTotal,
       uvFaibles,
       uvList,
+      statut,
+      statutHeure,
+      statutNomAgent,
     }
   })
 
@@ -121,6 +158,7 @@ export default async function PointsPage() {
         <NouveauPointForm atLimit={atLimit} maxPoints={limits.maxPoints} />
       </div>
 
+      <RealtimeSessions pointIds={pointIds} />
       <PointsView stats={stats} />
     </div>
   )

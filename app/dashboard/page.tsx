@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getUserPermissions } from '@/lib/permissions'
 import { formatMontant } from '@/lib/utils'
 import {
@@ -226,7 +227,8 @@ async function DashboardAgent({
 // ─── Vue Propriétaire ─────────────────────────────────────────────────────────
 
 async function DashboardProprietaire({ userId, depuis }: { userId: string; depuis: string }) {
-  const supabase = await createClient()
+  const supabase    = await createClient()
+  const adminClient = createAdminClient()
 
   const { data: points } = await supabase
     .from('points_de_vente')
@@ -265,8 +267,8 @@ async function DashboardProprietaire({ userId, depuis }: { userId: string; depui
       .select('montant, point_de_vente_id')
       .in('point_de_vente_id', pointIds.length > 0 ? pointIds : ['none'])
       .eq('mode_paiement', 'ESPECES'),
-    // Sessions agents du jour
-    supabase
+    // Sessions agents du jour (adminClient pour bypass RLS)
+    adminClient
       .from('sessions_agents')
       .select('point_de_vente_id, ouvert_a, ferme_a, nom_agent')
       .in('point_de_vente_id', pointIds.length > 0 ? pointIds : ['none'])
