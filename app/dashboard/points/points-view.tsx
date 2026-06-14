@@ -76,12 +76,26 @@ export default function PointsView({ stats }: { stats: PointStat[] }) {
                     <p className="text-xs text-gray-400">{s.agentsCount} agent(s)</p>
                   </div>
                 </div>
-                {s.uvFaibles > 0 && (
-                  <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
-                    <AlertTriangle className="w-3 h-3" />
-                    {s.uvFaibles} UV faible{s.uvFaibles > 1 ? 's' : ''}
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {s.statut === 'ouvert' && (
+                    <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      Ouvert · {s.statutHeure}
+                    </span>
+                  )}
+                  {s.statut === 'ferme' && (
+                    <span className="flex items-center gap-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                      Fermé · {s.statutHeure}
+                    </span>
+                  )}
+                  {s.uvFaibles > 0 && (
+                    <span className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
+                      <AlertTriangle className="w-3 h-3" />
+                      {s.uvFaibles} UV faible{s.uvFaibles > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {s.adresse && (
