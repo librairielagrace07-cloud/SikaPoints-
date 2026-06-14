@@ -62,13 +62,15 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
 
     // Enregistrer l'ouverture de session de l'agent via adminClient (bypass RLS)
     const userId = signInData.user?.id
+    console.log('[session] userId:', userId)
     if (userId) {
-      const { data: agent } = await adminClient
+      const { data: agent, error: agentErr } = await adminClient
         .from('agents')
         .select('id, nom_complet, point_de_vente_id')
         .eq('user_id', userId)
         .eq('actif', true)
-        .single()
+        .maybeSingle()
+      console.log('[session] agent:', agent, 'err:', agentErr)
       if (agent) {
         const a = agent as { id: string; nom_complet: string; point_de_vente_id: string }
         await adminClient
@@ -76,13 +78,14 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
           .update({ ferme_a: new Date().toISOString() })
           .eq('user_id', userId)
           .is('ferme_a', null)
-        await adminClient.from('sessions_agents').insert({
+        const { error: insertErr } = await adminClient.from('sessions_agents').insert({
           agent_id:          a.id,
           point_de_vente_id: a.point_de_vente_id,
           user_id:           userId,
           nom_agent:         a.nom_complet,
           ouvert_a:          new Date().toISOString(),
         })
+        console.log('[session] insert error:', insertErr)
       }
     }
 
