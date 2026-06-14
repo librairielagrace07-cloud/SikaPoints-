@@ -29,7 +29,7 @@ function Nav({ estProprietaire }: { estProprietaire: boolean }) {
     return (
       <Link
         href={`/dashboard/parametres?onglet=${o.id}`}
-        className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors group overflow-hidden ${
+        className={`relative flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-xl text-sm font-medium transition-colors group overflow-hidden shrink-0 ${
           selected
             ? o.danger ? 'text-red-700' : 'text-blue-700'
             : o.danger ? 'text-red-400 hover:text-red-700' : 'text-gray-500 hover:text-gray-900'
@@ -69,11 +69,13 @@ function Nav({ estProprietaire }: { estProprietaire: boolean }) {
   }
 
   return (
-    <nav className="space-y-0.5">
+    <nav className="flex lg:flex-col gap-0.5 lg:space-y-0.5">
       {normaux.map(o => <Item key={o.id} o={o} />)}
       {dangereux.length > 0 && (
         <>
-          <div className="pt-3 mt-3 border-t border-gray-100" />
+          {/* Séparateur : horizontal sur desktop, vertical sur mobile */}
+          <div className="hidden lg:block pt-3 mt-3 border-t border-gray-100" />
+          <div className="lg:hidden self-stretch w-px bg-gray-200 mx-1 my-1 shrink-0" />
           {dangereux.map(o => <Item key={o.id} o={o} />)}
         </>
       )}

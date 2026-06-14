@@ -67,54 +67,59 @@ export default async function ParametresPage({
   return (
     <div>
       {/* ── En-tête page ─────────────────────────────────────────────────── */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Paramètres</h1>
         <p className="text-gray-500 text-sm mt-1">Gérez votre compte et vos préférences</p>
       </div>
 
-      {/* ── Layout 2 colonnes ────────────────────────────────────────────── */}
-      <div className="flex gap-8 items-start">
+      {/* ── Layout responsive ─────────────────────────────────────────────── */}
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-8 items-start">
 
-        {/* ── Colonne gauche : profil mini + nav ───────────────────────── */}
-        <aside className="w-56 shrink-0 sticky top-6">
-          {/* Mini carte profil */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden ring-2 ring-blue-50 mb-3">
+        {/* ── Sidebar (desktop) / Header compact (mobile) ───────────────── */}
+        <aside className="w-full lg:w-56 shrink-0 lg:sticky lg:top-6 space-y-4">
+
+          {/* Carte profil — horizontal sur mobile, verticale sur desktop */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div className="flex items-center gap-3 lg:flex-col lg:items-center lg:text-center lg:gap-0">
+              <div className="w-12 h-12 lg:w-14 lg:h-14 lg:mb-3 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden ring-2 ring-blue-50 shrink-0">
                 {p?.avatar_url ? (
                   <Image src={p.avatar_url} alt={nom} width={56} height={56} className="w-full h-full object-cover" unoptimized />
                 ) : (
-                  <span className="text-xl font-bold text-blue-600">{initial}</span>
+                  <span className="text-lg lg:text-xl font-bold text-blue-600">{initial}</span>
                 )}
               </div>
-              <p className="font-semibold text-gray-900 text-sm truncate w-full">{nom}</p>
-              {!email.endsWith('@mmmanager.local') && (
-                <p className="text-xs text-gray-400 truncate w-full mt-0.5">{email}</p>
-              )}
-              <div className={`flex items-center gap-1 mt-2.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                estProprietaire ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-              }`}>
-                {estProprietaire ? <Crown className="w-3 h-3" /> : <BadgeCheck className="w-3 h-3" />}
-                {estProprietaire ? 'Propriétaire' : 'Agent'}
+              <div className="min-w-0 flex-1 lg:flex-none lg:w-full">
+                <p className="font-semibold text-gray-900 text-sm truncate">{nom}</p>
+                {!email.endsWith('@mmmanager.local') && (
+                  <p className="text-xs text-gray-400 truncate mt-0.5">{email}</p>
+                )}
+                <div className="flex lg:justify-center">
+                  <div className={`flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full text-xs font-semibold w-fit ${
+                    estProprietaire ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {estProprietaire ? <Crown className="w-3 h-3" /> : <BadgeCheck className="w-3 h-3" />}
+                    {estProprietaire ? 'Propriétaire' : 'Agent'}
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-300 mt-1.5 hidden lg:block">Membre depuis {dateStr}</p>
               </div>
-              <p className="text-[11px] text-gray-300 mt-2">Membre depuis {dateStr}</p>
             </div>
           </div>
 
-          {/* Navigation */}
-          <div className="bg-white rounded-xl border border-gray-200 p-2 shadow-sm">
+          {/* Navigation — scrollable horizontalement sur mobile */}
+          <div className="bg-white rounded-xl border border-gray-200 p-2 shadow-sm overflow-x-auto scrollbar-hide">
             <OngletsNav estProprietaire={estProprietaire} />
           </div>
         </aside>
 
-        {/* ── Colonne droite : contenu ─────────────────────────────────── */}
-        <div className="flex-1 min-w-0">
+        {/* ── Contenu principal ─────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0 w-full">
           <div className={`bg-white rounded-xl border shadow-sm overflow-hidden ${
             isDanger ? 'border-red-200' : 'border-gray-200'
           }`}>
 
             {/* Header de section */}
-            <div className={`px-6 py-5 border-b ${isDanger ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}`}>
+            <div className={`px-4 lg:px-6 py-4 lg:py-5 border-b ${isDanger ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}`}>
               <h2 className={`font-bold text-base ${isDanger ? 'text-red-800' : 'text-gray-900'}`}>
                 {meta.titre}
               </h2>
@@ -122,7 +127,7 @@ export default async function ParametresPage({
             </div>
 
             {/* Contenu */}
-            <div className="px-6 py-6">
+            <div className="px-4 lg:px-6 py-5 lg:py-6">
               {onglet === 'profil' && (
                 <div className="space-y-8">
                   <div className="flex flex-col items-center pb-6 border-b border-gray-100">
