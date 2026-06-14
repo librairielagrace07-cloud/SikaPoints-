@@ -83,7 +83,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           permissions={permissions}
         />
       </Suspense>
-      <main className="flex-1 overflow-y-auto lg:p-8 p-4 pt-18 lg:pt-8">
+      <main className="flex-1 overflow-y-auto lg:p-8 p-4 pb-20 lg:pb-8">
         <OfflineBanner />
         {children}
       </main>
