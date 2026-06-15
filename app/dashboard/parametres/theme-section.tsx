@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useTheme, type Theme } from '@/lib/providers/theme-provider'
-import { Sun, Moon, Check } from 'lucide-react'
+import { Sun, Moon, Check, Mic } from 'lucide-react'
 
 const OPTIONS: { value: Theme; label: string; desc: string; Icon: React.ComponentType<{ className?: string }> }[] = [
   {
@@ -22,8 +22,18 @@ const OPTIONS: { value: Theme; label: string; desc: string; Icon: React.Componen
 export default function ThemeSection() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [voiceEnabled, setVoiceEnabled] = useState(false)
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+    setVoiceEnabled(localStorage.getItem('voice_input_enabled') === 'true')
+  }, [])
+
+  function toggleVoice() {
+    const next = !voiceEnabled
+    setVoiceEnabled(next)
+    localStorage.setItem('voice_input_enabled', String(next))
+  }
 
   if (!mounted) {
     return (
@@ -79,6 +89,27 @@ export default function ThemeSection() {
       <p className="text-xs text-gray-400">
         La préférence est sauvegardée localement sur cet appareil.
       </p>
+
+      {/* Toggle saisie vocale */}
+      <div className="pt-4 border-t border-gray-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${voiceEnabled ? 'bg-blue-100' : 'bg-gray-100'}`}>
+              <Mic className={`w-4 h-4 ${voiceEnabled ? 'text-blue-600' : 'text-gray-400'}`} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Saisie vocale</p>
+              <p className="text-xs text-gray-400">Dicter les champs du formulaire de transaction</p>
+            </div>
+          </div>
+          <button
+            onClick={toggleVoice}
+            className={`relative w-11 h-6 rounded-full transition-colors ${voiceEnabled ? 'bg-blue-600' : 'bg-gray-200'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${voiceEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

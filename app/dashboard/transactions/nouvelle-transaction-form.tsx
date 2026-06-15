@@ -1,11 +1,13 @@
 'use client'
 
-import { useActionState, useState, useEffect, startTransition } from 'react'
+import { useActionState, useState, useEffect, useRef, startTransition } from 'react'
 import { enregistrerTransaction } from '@/lib/actions/transactions'
 import { createClient } from '@/lib/supabase/client'
 import { addPendingTx } from '@/lib/offline/db'
 import { useOffline } from '@/hooks/use-offline'
-import { ArrowDownCircle, ArrowUpCircle, Plus, X, WifiOff, CloudOff, CheckCircle2 } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Plus, X, WifiOff, CloudOff, CheckCircle2, Mic, MicOff } from 'lucide-react'
+
+const MONTANTS_RAPIDES = [5_000, 10_000, 20_000, 25_000, 50_000, 100_000, 200_000, 500_000]
 
 interface Reseau { id: string; nom: string; couleur: string }
 interface Point  { id: string; nom: string }
@@ -30,7 +32,21 @@ export default function NouvelleTransactionForm({
   const [agents,          setAgents]         = useState<Agent[]>([])
   const [offlineQueued,   setOfflineQueued]  = useState(false)
   const [offlineError,    setOfflineError]   = useState(false)
+  const [voiceEnabled] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem('voice_input_enabled') === 'true'
+  )
+  const [listeningFor,    setListeningFor]   = useState<string | null>(null)
   const { isOnline, refreshCount } = useOffline()
+
+  const montantRef     = useRef<HTMLInputElement>(null)
+  const teleRef        = useRef<HTMLInputElement>(null)
+  const refTxRef       = useRef<HTMLInputElement>(null)
+  const numeroPieceRef = useRef<HTMLInputElement>(null)
+  const noteRef        = useRef<HTMLInputElement>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+
+  const isVoiceSupported = typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
 
   const defaultType = peut_deposer ? 'DEPOT' : 'RETRAIT'
 
@@ -53,6 +69,51 @@ export default function NouvelleTransactionForm({
   useEffect(() => {
     if (state.success) setTimeout(() => setOpen(false), 800)
   }, [state.success])
+
+  function startVoice(field: string, ref: React.RefObject<HTMLInputElement | null>, digitsOnly = false) {
+    if (!isVoiceSupported || !voiceEnabled) return
+    if (listeningFor === field) {
+      recognitionRef.current?.stop()
+      setListeningFor(null)
+      return
+    }
+    recognitionRef.current?.stop()
+    const SR = (window.SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition: typeof SpeechRecognition }).webkitSpeechRecognition)
+    const rec = new SR()
+    rec.lang = 'fr-FR'
+    rec.interimResults = false
+    rec.maxAlternatives = 1
+    setListeningFor(field)
+    rec.onresult = (e) => {
+      let text = e.results[0][0].transcript
+      if (digitsOnly) text = text.replace(/\D/g, '')
+      if (ref.current) {
+        ref.current.value = text
+        ref.current.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+    }
+    rec.onend = () => setListeningFor(null)
+    rec.onerror = () => setListeningFor(null)
+    recognitionRef.current = rec
+    rec.start()
+  }
+
+  const micBtn = (field: string, ref: React.RefObject<HTMLInputElement | null>, digitsOnly = false) => {
+    if (!voiceEnabled || !isVoiceSupported) return null
+    const active = listeningFor === field
+    return (
+      <button
+        type="button"
+        onClick={() => startVoice(field, ref, digitsOnly)}
+        className={`ml-auto flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md transition-colors ${
+          active ? 'bg-red-100 text-red-600 animate-pulse' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+        }`}
+      >
+        {active ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+        {active ? 'Stop' : 'Voix'}
+      </button>
+    )
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -244,8 +305,12 @@ export default function NouvelleTransactionForm({
 
               {/* Montant */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Montant (FCFA) *</label>
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                  Montant (FCFA) *
+                  {micBtn('montant', montantRef, true)}
+                </label>
                 <input
+                  ref={montantRef}
                   name="montant"
                   type="number"
                   min={1}
@@ -254,15 +319,32 @@ export default function NouvelleTransactionForm({
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ex: 25000"
                 />
+                {/* Montants rapides */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {MONTANTS_RAPIDES.map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        if (montantRef.current) montantRef.current.value = String(m)
+                      }}
+                      className="px-2.5 py-1 text-xs bg-gray-100 hover:bg-blue-100 hover:text-blue-700 text-gray-600 rounded-full font-medium transition-colors"
+                    >
+                      {m >= 1000 ? `${m / 1000}k` : m}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Téléphone client — masqué pour Wave */}
               {!isWave && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                     Numéro de téléphone client
+                    {micBtn('telephone', teleRef, true)}
                   </label>
                   <input
+                    ref={teleRef}
                     name="telephone_client"
                     type="tel"
                     maxLength={20}
@@ -289,8 +371,12 @@ export default function NouvelleTransactionForm({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">N° de pièce</label>
+                  <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                    N° de pièce
+                    {micBtn('numero_piece', numeroPieceRef)}
+                  </label>
                   <input
+                    ref={numeroPieceRef}
                     name="numero_piece"
                     type="text"
                     maxLength={50}
@@ -302,15 +388,17 @@ export default function NouvelleTransactionForm({
 
               {/* Référence / ID de transaction */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                   ID de transaction
                   {reseauChoisi && (
                     <span className="ml-1 text-gray-400 font-normal text-xs">
                       ({reseauChoisi.nom})
                     </span>
                   )}
+                  {micBtn('reference', refTxRef)}
                 </label>
                 <input
+                  ref={refTxRef}
                   name="reference_transaction"
                   type="text"
                   maxLength={100}
@@ -336,8 +424,12 @@ export default function NouvelleTransactionForm({
 
               {/* Note */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                  Note
+                  {micBtn('note', noteRef)}
+                </label>
                 <input
+                  ref={noteRef}
                   name="note"
                   maxLength={500}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
