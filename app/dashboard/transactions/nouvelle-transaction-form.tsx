@@ -272,6 +272,34 @@ export default function NouvelleTransactionForm({
                 </div>
               )}
 
+              {/* Pièce d'identité client */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Type de pièce</label>
+                  <select
+                    name="type_piece"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">— Aucune —</option>
+                    <option value="CNI">CNI</option>
+                    <option value="PASSEPORT">Passeport</option>
+                    <option value="PERMIS">Permis de conduire</option>
+                    <option value="CARTE_CONSULAIRE">Carte consulaire</option>
+                    <option value="AUTRE">Autre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">N° de pièce</label>
+                  <input
+                    name="numero_piece"
+                    type="text"
+                    maxLength={50}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ex: CI0123456"
+                  />
+                </div>
+              </div>
+
               {/* Référence / ID de transaction */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

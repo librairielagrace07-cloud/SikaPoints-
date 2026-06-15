@@ -17,6 +17,8 @@ const TransactionSchema = z.object({
   note:                   safeText(0, 500, 'Note').optional().or(z.literal('')).optional(),
   telephone_client:       telephoneSchema.optional().or(z.literal('')).optional(),
   reference_transaction:  safeText(0, 100, 'Référence').optional().or(z.literal('')).optional(),
+  type_piece:             z.enum(['CNI', 'PASSEPORT', 'PERMIS', 'CARTE_CONSULAIRE', 'AUTRE']).optional(),
+  numero_piece:           safeText(0, 50, 'Numéro de pièce').optional().or(z.literal('')).optional(),
 })
 
 export type ActionState = { error?: string; success?: boolean }
@@ -35,6 +37,8 @@ export async function enregistrerTransaction(prevState: ActionState, formData: F
     note:                   (formData.get('note') as string)                  || undefined,
     telephone_client:       (formData.get('telephone_client') as string)      || undefined,
     reference_transaction:  (formData.get('reference_transaction') as string) || undefined,
+    type_piece:             (formData.get('type_piece') as string)            || undefined,
+    numero_piece:           (formData.get('numero_piece') as string)          || undefined,
   }
 
   const parsed = TransactionSchema.safeParse(raw)
@@ -88,6 +92,8 @@ export async function enregistrerTransaction(prevState: ActionState, formData: F
     note:                  parsed.data.note                  || null,
     telephone_client:      parsed.data.telephone_client      || null,
     reference_transaction: parsed.data.reference_transaction || null,
+    type_piece:            parsed.data.type_piece            || null,
+    numero_piece:          parsed.data.numero_piece          || null,
   })
 
   if (error) return { error: error.message }
