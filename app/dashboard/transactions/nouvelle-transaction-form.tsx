@@ -43,7 +43,8 @@ export default function NouvelleTransactionForm({
   const refTxRef       = useRef<HTMLInputElement>(null)
   const numeroPieceRef = useRef<HTMLInputElement>(null)
   const noteRef        = useRef<HTMLInputElement>(null)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null)
 
   const isVoiceSupported = typeof window !== 'undefined' &&
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
@@ -78,13 +79,15 @@ export default function NouvelleTransactionForm({
       return
     }
     recognitionRef.current?.stop()
-    const SR = (window.SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition: typeof SpeechRecognition }).webkitSpeechRecognition)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
     const rec = new SR()
     rec.lang = 'fr-FR'
     rec.interimResults = false
     rec.maxAlternatives = 1
     setListeningFor(field)
-    rec.onresult = (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
       let text = e.results[0][0].transcript
       if (digitsOnly) text = text.replace(/\D/g, '')
       if (ref.current) {
